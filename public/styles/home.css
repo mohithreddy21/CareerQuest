@@ -1,22 +1,24 @@
 /* Base Styles */
+/* In your main CSS file or variables file */
 :root {
-    --primary-color: #2563eb;
-    --primary-dark: #1d4ed8;
-    --primary-light: #dbeafe;
-    --text-color: #111827;
-    --text-light: #6b7280;
-    --white: #ffffff;
-    --gray-50: #f9fafb;
-    --gray-100: #f3f4f6;
-    --gray-200: #e5e7eb;
-    --gray-800: #1f2937;
-    --gray-900: #111827;
-    --border-color: #e5e7eb;
-    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-    --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-    --radius: 0.5rem;
-  }
+  --primary-color: #007bff; /* Example blue */
+  --primary-darker: #0056b3;
+  --success-color: #28a745; /* Example green */
+  --success-darker: #1e7e34;
+  --white: #ffffff;
+  --light-grey: #f8f9fa;
+  --grey-light: #e9ecef;
+  --text-color: #333;
+  --text-light: #6c757d;
+  --text-darker: #212529;
+  --border-color: #dee2e6;
+  --radius: 0.25rem;
+  --radius-sm: 0.2rem;
+  --shadow-sm: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+  --shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+  --accent-color: #ffc107; /* Example yellow/amber */
+  --accent-light: #fff3cd;
+}
   
   * {
     margin: 0;

@@ -13,47 +13,22 @@
     <!-- Navigation Bar -->
     <%- include("partials/navbar") %>
 
-    <!-- Mobile Menu -->
-    <div id="mobile-menu" class="mobile-menu">
-        <div class="mobile-menu-links">
-            <a href="/" class="mobile-menu-link">Home</a>
-            <a href="/resume-builder" class="mobile-menu-link">Resume Builder</a>
-            <a href="/jobs" class="mobile-menu-link active">Jobs</a>
-            <div class="mobile-auth-buttons">
-                <a href="/login" class="btn btn-light btn-block">Login</a>
-                <a href="/signup" class="btn btn-primary btn-block">Sign Up</a>
-            </div>
-        </div>
-    </div>
 
     <main class="jobs-page">
         <div class="container">
-            <section class="jobs-header">
-                <h1>Find Your Perfect Job</h1>
+            <section class="jobs-header" style="padding-top: 6rem;"> <h1>Find Your Perfect Job</h1>
                 <p>Discover opportunities tailored for students and early-career professionals</p>
             </section>
-
-            <!-- Search Bar -->
-            <section class="search-section">
-                <div class="search-bar">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="search-icon"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                    <input type="text" id="job-search" placeholder="Search jobs by title, company, or keyword..." aria-label="Search jobs">
-                    <button class="btn btn-primary search-btn">Search</button>
-                </div>
-            </section>
-
-            <!-- Filter Section -->
-            <form id="job-filter-form" method="POST" action="/JobFilter">
-                <section class="filter-section">
-                    <div class="filter-header">
-                        <h2>Filters</h2>
-                        <button type="button" id="toggle-filters" class="toggle-filters-btn">
-                            <span>Show Filters</span>
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
-                        </button>
+    
+            <section class="search-filter-container" style="margin-bottom: 2rem;">
+                
+                <form id="job-filter-form" method="POST" action="/JobFilter" style="margin-top: 1rem;">
+                    <div class="search-bar">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="search-icon"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></svg>
+                        <input type="text" id="job-search" name="search" placeholder="Search jobs by title, company, or keyword..." aria-label="Search jobs">
+                        <button class="btn btn-primary search-btn">Search</button>
                     </div>
-            
-                    <div id="filters-container" class="filters-container">
+                    <div class="filters-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem;">
                         <div class="filter-group">
                             <label for="location">Location</label>
                             <select id="location" name="location" class="filter-select">
@@ -67,67 +42,42 @@
                                 <option value="remote">Remote</option>
                             </select>
                         </div>
-            
+    
                         <div class="filter-group">
-                            <label>Job Type</label>
-                            <div class="checkbox-group">
-                                <label class="checkbox-label">
-                                    <input type="checkbox" name="job-type" value="full-time">
-                                    <span>Full-time</span>
-                                </label>
-                                <label class="checkbox-label">
-                                    <input type="checkbox" name="job-type" value="part-time">
-                                    <span>Part-time</span>
-                                </label>
-                                <label class="checkbox-label">
-                                    <input type="checkbox" name="job-type" value="internship">
-                                    <span>Internship</span>
-                                </label>
-                                <label class="checkbox-label">
-                                    <input type="checkbox" name="job-type" value="remote">
-                                    <span>Remote</span>
-                                </label>
-                                <label class="checkbox-label">
-                                    <input type="checkbox" name="job-type" value="hybrid">
-                                    <span>Hybrid</span>
-                                </label>
-                            </div>
-                        </div>
+                            <label for="job-type">Job Type</label>
+                            <select id="job-type" name="job-type" class="filter-select">
+                                <option value="">All Types</option>
+                                <option value="full-time">Full-time</option>
+                                <option value="part-time">Part-time</option>
+                                <option value="internship">Internship</option>
 
+                            </select>
+                        </div>
+    
                         <div class="filter-group">
-                            <label for="experience">Experience Level</label>
+                            <label for="experience">Experience</label>
                             <select id="experience" name="experience" class="filter-select">
-                                <option value="">All Experience Levels</option>
+                                <option value="">Any Experience</option>
                                 <option value="fresher">Fresher</option>
                                 <option value="0-1">0-1 years</option>
                                 <option value="1-3">1-3 years</option>
                                 <option value="3+">3+ years</option>
                             </select>
                         </div>
-            
-
-            
+    
                         <div class="filter-group">
                             <label for="salary">Salary Range</label>
                             <select id="salary" name="salary" class="filter-select">
-                                <option value="">All Salary Ranges</option>
+                                <option value="">All Salaries</option>
                                 <option value="below-10k">Below ₹10K</option>
                                 <option value="10k-20k">₹10K - ₹20K</option>
                                 <option value="20k-40k">₹20K - ₹40K</option>
                                 <option value="above-40k">Above ₹40K</option>
                             </select>
                         </div>
-            
-                        <div class="filter-group">
-                            <label for="sort-by">Sort By</label>
-                            <select id="sort-by" name="sort-by" class="filter-select">
-                                <option value="newest">Newest</option>
-                                <option value="oldest">Oldest</option>
-                                <option value="relevant">Most Relevant</option>
-                                <option value="salary">Highest Salary</option>
-                            </select>
-                        </div>
-            
+    
+
+    
                         <div class="filter-group">
                             <label for="date-posted">Date Posted</label>
                             <select id="date-posted" name="date-posted" class="filter-select">
@@ -138,21 +88,18 @@
                                 <option value="month">Last Month</option>
                             </select>
                         </div>
-            
-
                     </div>
-            
-                    <div class="filter-actions">
+    
+                    <div style="display: flex; justify-content: flex-end; margin-top: 1rem; gap: 0.5rem;">
                         <button type="submit" id="apply-filters" class="btn btn-primary">Apply Filters</button>
                         <button type="reset" id="clear-filters" class="btn btn-light">Clear All</button>
                     </div>
-                </section>
-            </form>
-            
+                </form>
+            </section>
 
             <!-- Job Results Count -->
             <section class="results-count">
-                <p><span id="jobs-count">24</span> jobs found</p>
+                <p><span id="jobs-count"><%= (totalJobs ?? "") + " Jobs found" %></span></p>
             </section>
 
             <!-- Job Listings -->
@@ -164,7 +111,7 @@
                         <!-- Header Section -->
                         <div class="job-card-header">
                           <div class="job-card-company-logo">
-                            <img src="<%= job.employer_logo || '/default-logo.png' %>" alt="<%= job.employer_name %> Logo">
+                            <img src="<%= job.employer_logo || `https://ui-avatars.com/api/?name=${encodeURIComponent(job.employer_name)}&background=random&size=64` %>" alt="<%= job.employer_name %> Logo">
                           </div>
                           <div class="job-card-title">
                             <h3><%= job.job_title %></h3>
@@ -207,9 +154,7 @@
                         </div>
                   
                         <!-- Apply Button -->
-                        <a href="<%= job.job_apply_link %>" class="btn btn-outline btn-block" target="_blank" rel="noopener noreferrer">
-                          Apply Now
-                        </a>
+                        <a href="/job-details/<%= job.job_id %>" class="btn btn-outline btn-block">View Details</a>
                       </div>
                     <% } %>
                   <% } %>
@@ -217,21 +162,61 @@
                                 
             <!-- Pagination -->
             <section class="pagination">
-                <button class="pagination-btn" disabled>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
-                    Previous
-                </button>
+                <!-- Previous Button -->
+                <form method="POST" action="/JobFilter">
+                    <input type="hidden" name="page" value="<%= currentPage - 1 %>">
+                    <% if (filters) { %>
+                        <input type="hidden" name="location" value="<%= filters.location %>">
+                        <input type="hidden" name="job-type" value="<%= filters['job-type'] %>">
+                        <input type="hidden" name="experience" value="<%= filters.experience %>">
+                        <input type="hidden" name="date-posted" value="<%= filters['date-posted'] %>">
+                    <% } %>
+                    <button class="pagination-btn" <%= currentPage === 1 ? 'disabled' : '' %>>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="15 18 9 12 15 6"></polyline>
+                        </svg>
+                        Previous
+                    </button>
+                </form>
+            
+                <!-- Page Numbers -->
                 <div class="pagination-numbers">
-                    <button class="pagination-number active">1</button>
-                    <button class="pagination-number">2</button>
-                    <button class="pagination-number">3</button>
-                    <button class="pagination-number">4</button>
+                    <% let startPage = Math.max(currentPage - 1, 1); %>
+                    <% let endPage = Math.min(startPage + 3, totalPages); %>
+            
+                    <% for (let i = startPage; i <= endPage; i++) { %>
+                        <form method="POST" action="/JobFilter" style="display:inline;">
+                            <input type="hidden" name="page" value="<%= i %>">
+                            <% if (filters) { %>
+                                <input type="hidden" name="location" value="<%= filters.location %>">
+                                <input type="hidden" name="job-type" value="<%= filters['job-type'] %>">
+                                <input type="hidden" name="experience" value="<%= filters.experience %>">
+                                <input type="hidden" name="date-posted" value="<%= filters['date-posted'] %>">
+                            <% } %>
+                            <button class="pagination-number <%= i === currentPage ? 'active' : '' %>"><%= i %></button>
+                        </form>
+                    <% } %>
                 </div>
-                <button class="pagination-btn">
-                    Next
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
-                </button>
+            
+                <!-- Next Button -->
+                <form method="POST" action="/JobFilter">
+                    <input type="hidden" name="page" value="<%= currentPage + 1 %>">
+                    <% if (filters) { %>
+                        <input type="hidden" name="location" value="<%= filters.location %>">
+                        <input type="hidden" name="job-type" value="<%= filters['job-type'] %>">
+                        <input type="hidden" name="experience" value="<%= filters.experience %>">
+                        <input type="hidden" name="date-posted" value="<%= filters['date-posted'] %>">
+                    <% } %>
+                    <button class="pagination-btn" <%= currentPage === totalPages ? 'disabled' : '' %>>
+                        Next
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="9 18 15 12 9 6"></polyline>
+                        </svg>
+                    </button>
+                </form>
             </section>
+            
+        
 
             <!-- No Results Message (hidden by default) -->
             <section id="no-results" class="no-results" style="display: none;">

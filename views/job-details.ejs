@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= job.job_title %> - JobReady</title>
+    <link rel="stylesheet" href="/styles/home.css">
+    <link rel="stylesheet" href="/styles/job-details.css">
+    <link rel="stylesheet" href="/styles/chatbot.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <%- include("partials/navbar") %>
+
+    <main class="job-details-page">
+        <div class="container">
+            <section class="job-header">
+                <h1><%= job.job_title %></h1>
+                <p class="company"><%= job.employer_name %> - <%= job.job_location || 'Location not specified' %></p>
+                <div class="tags">
+                    <span class="job-tag"><%= job.job_employment_type %></span>
+                    <% if (job.job_is_remote) { %>
+                        <span class="job-tag">Remote</span>
+                    <% } %>
+                    <% if (job.job_city && job.job_country) { %>
+                        <span class="job-tag"><%= job.job_city %>, <%= job.job_country %></span>
+                    <% } %>
+                </div>
+            </section>
+
+            <section class="important-details">
+                <h2>Key Details</h2>
+                <div class="details-grid">
+                    <div><strong>Published By:</strong> <%= job.job_publisher %></div>
+                    <div><strong>Posted:</strong> <%= job.job_posted_at %></div>
+                    <% if (job.job_salary) { %>
+                        <div><strong>Salary:</strong> <%= job.job_salary %></div>
+                    <% } else if (job.job_min_salary && job.job_max_salary) { %>
+                        <div><strong>Salary Range:</strong> <%= job.job_min_salary %> - <%= job.job_max_salary %> <%= job.job_salary_period || '' %></div>
+                    <% } %>
+                    <% if (job.employer_website) { %>
+                        <div><strong>Company Website:</strong> <a href="<%= job.employer_website %>" target="_blank" rel="noopener noreferrer"><%= job.employer_website %></a></div>
+                    <% } %>
+                    <div><strong>Google Job Link:</strong> <a href="<%= job.job_google_link %>" target="_blank" rel="noopener noreferrer">View on Google Jobs</a></div>
+                    <div><strong>ONET SOC Code:</strong> <%= job.job_onet_soc %></div>
+                    <div><strong>ONET Job Zone:</strong> <%= job.job_onet_job_zone %></div>
+                </div>
+            </section>
+
+            <% if (job.job_highlights && job.job_highlights.Qualifications && job.job_highlights.Qualifications.length > 0) { %>
+                <section class="qualifications">
+                    <h2>Qualifications</h2>
+                    <ul>
+                        <% job.job_highlights.Qualifications.forEach(qualification => { %>
+                            <li><%= qualification %></li>
+                        <% }); %>
+                    </ul>
+                </section>
+            <% } %>
+
+            <% if (job.job_highlights && job.job_highlights.Responsibilities && job.job_highlights.Responsibilities.length > 0) { %>
+                <section class="responsibilities">
+                    <h2>Responsibilities</h2>
+                    <ul>
+                        <% job.job_highlights.Responsibilities.forEach(responsibility => { %>
+                            <li><%= responsibility %></li>
+                        <% }); %>
+                    </ul>
+                </section>
+            <% } %>
+
+            <section class="job-description">
+                <h2>Job Description</h2>
+                <%- job.job_description.replace(/\n/g, '<br><br>') %>
+            </section>
+
+            <section class="apply-section">
+                <a href="<%= job.job_apply_link %>" class="btn btn-primary apply-now-btn" target="_blank" rel="noopener noreferrer">
+                    Apply Now
+                </a>
+                <button id="tailorResumeBtn" class="btn btn-secondary">Tailor Your Resume</button>
+                <p class="apply-note">You will be redirected to the employer's website to apply.</p>
+            </section>
+            <%- include("partials/chatbot") %>
+            
+        </div>
+    </main>
+
+    <%- include("partials/footer") %>
+    <script src="/scripts/home.js"></script>
+    <script src="/scripts/job-details.js"></script>
+    <script src="/scripts/chatbot.js"></script>
+</body>
+</html>

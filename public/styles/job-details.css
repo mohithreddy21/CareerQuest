@@ -1,0 +1,336 @@
+/* public/styles/job-details.css */
+
+.job-details-page {
+    padding-top: 4rem; /* Adjust based on your navbar height */
+    background-color: var(--white);
+}
+
+.job-details-page .container {
+    max-width: 960px;
+    margin: 2rem auto;
+    padding: 2rem;
+    background-color: var(--white);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+}
+
+.job-header {
+    text-align: left;
+    margin-bottom: 2rem;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 1.5rem;
+}
+
+.job-header h1 {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+    color: var(--text-darker);
+}
+
+.job-header .company {
+    color: var(--text-light);
+    font-size: 1rem;
+    margin-bottom: 1rem;
+}
+
+.job-header .tags {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.job-header .job-tag {
+    display: inline-block;
+    background-color: var(--accent-light);
+    color: var(--accent-color);
+    padding: 0.3rem 0.6rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.8rem;
+}
+
+.important-details {
+    margin-bottom: 2rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.important-details h2 {
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+    color: var(--text-darker);
+}
+
+.details-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.details-grid div {
+    color: var(--text-color);
+    line-height: 1.6;
+}
+
+.details-grid strong {
+    font-weight: 600;
+    color: var(--primary-color);
+    margin-right: 0.5rem;
+}
+
+.qualifications,
+.responsibilities {
+    margin-bottom: 2rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.qualifications h2,
+.responsibilities h2 {
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+    color: var(--text-darker);
+}
+
+.qualifications ul,
+.responsibilities ul {
+    list-style: disc;
+    padding-left: 1.5rem;
+}
+
+.qualifications li,
+.responsibilities li {
+    color: var(--text-color);
+    line-height: 1.6;
+    margin-bottom: 0.5rem;
+}
+
+.job-description {
+    margin-bottom: 2rem;
+    line-height: 1.7;
+    color: var(--text-color);
+}
+
+.job-description h2 {
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+    color: var(--text-darker);
+}
+
+.job-description p {
+    margin-bottom: 1rem;
+}
+
+/* Style for the apply section to contain buttons inline */
+.apply-section {
+    display: flex; /* Or inline-block if you prefer */
+    align-items: center; /* Vertically align items in the section */
+    gap: 10px; /* Add some space between the button and other elements */
+    margin-bottom: 20px; /* Add some space below the section */
+}
+
+/* Basic styling for the Tailor Your Resume button */
+#tailorResumeBtn {
+    background-color: #f0f0f0; /* Light gray background */
+    color: #333; /* Dark text */
+    border: 1px solid #ccc; /* Light gray border */
+    border-radius: 8px; /* Rounded corners */
+    padding: 10px 15px; /* Padding inside the button */
+    cursor: pointer; /* Change cursor on hover */
+    font-size: 0.9rem; /* Slightly smaller font size */
+    text-decoration: none; /* Remove default link underline */
+    display: inline-block; /* Allows it to sit next to other inline elements */
+}
+
+#tailorResumeBtn:hover {
+    background-color: #e0e0e0; /* Slightly darker on hover */
+}
+.apply-now-btn {
+    display: inline-block;
+    padding: 1rem 2rem;
+    background-color: var(--success-color);
+    color: var(--white);
+    border: none;
+    border-radius: var(--radius);
+    font-size: 1.1rem;
+    font-weight: 500;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    margin-bottom: 0.5rem;
+}
+
+.apply-now-btn:hover {
+    background-color: var(--success-darker);
+}
+
+.apply-note {
+    color: var(--text-light);
+    font-size: 0.9rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .job-details-page .container {
+        padding: 1.5rem;
+        margin: 1rem;
+    }
+
+    .job-header h1 {
+        font-size: 1.75rem;
+    }
+
+    .important-details h2,
+    .qualifications h2,
+    .responsibilities h2,
+    .job-description h2 {
+        font-size: 1.3rem;
+    }
+
+    .apply-now-btn {
+        font-size: 1rem;
+        padding: 0.8rem 1.5rem;
+    }
+
+    .details-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ... (previous styles) ... */
+
+/* Chatbot Modal Styles */
+.modal {
+    display: none; /* Hidden by default */
+    position: fixed; /* Stay in place */
+    z-index: 1000; /* Sit on top */
+    left: 0;
+    top: 0;
+    width: 100%; /* Full width */
+    height: 100%; /* Full height */
+    overflow: auto; /* Enable scroll if needed */
+    background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
+}
+
+.modal-content {
+    background-color: #fefefe;
+    margin: 15% auto; /* 15% from the top and centered */
+    padding: 20px;
+    border: 1px solid #888;
+    width: 80%; /* Could be more or less, depending on screen size */
+    border-radius: var(--radius);
+    position: relative;
+}
+
+.close-button {
+    color: #aaa;
+    position: absolute;
+    top: 10px;
+    right: 15px;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.close-button:hover,
+.close-button:focus {
+    color: black;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+#chatbot-container {
+    margin-top: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+#chat-window {
+    border: 1px solid var(--border-color);
+    padding: 10px;
+    height: 300px;
+    overflow-y: auto;
+    background-color: #f9f9f9;
+    border-radius: var(--radius-sm);
+}
+
+.chat-input-area {
+    display: flex;
+    gap: 5px;
+    align-items: center;
+}
+
+#template-selector {
+    padding: 8px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    flex-grow: 1;
+}
+
+#chat-input {
+    flex-grow: 3;
+    padding: 8px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+}
+
+#send-button {
+    padding: 8px 15px;
+    background-color: var(--primary-color);
+    color: var(--white);
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+}
+
+#send-button:hover {
+    background-color: var(--primary-darker);
+}
+
+#resume-preview-container {
+    margin-top: 20px;
+    border: 1px solid var(--border-color);
+    padding: 10px;
+    border-radius: var(--radius-sm);
+}
+
+#resume-preview {
+    white-space: pre-wrap; /* Preserve formatting */
+    font-family: monospace; /* Basic text preview */
+}
+
+.hidden {
+    display: none !important;
+}
+
+#login-prompt {
+    margin-top: 20px;
+    text-align: center;
+}
+
+#login-prompt a {
+    color: var(--primary-color);
+    text-decoration: none;
+}
+
+#login-prompt a:hover {
+    text-decoration: underline;
+}
+
+#download-resume-btn {
+    display: block;
+    margin-top: 10px;
+    padding: 10px 20px;
+    background-color: var(--success-color);
+    color: var(--white);
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    width: fit-content;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+#download-resume-btn:hover {
+    background-color: var(--success-darker);
+}
