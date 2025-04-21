@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Resume Builder | Resume.io Clone</title>
+  <link rel="stylesheet" href="/styles/resume-builder.css">
+  <link rel="stylesheet" href="/styles/builder.css">
+  <link rel="stylesheet" href="/styles/home.css">
+  
+</head>
+<body class="builder-page">
+  <%- include('partials/navbar') %>
+  
+  <main class="builder-main">
+    <div class="builder-container">
+      <div class="builder-sidebar">
+        <div class="template-selector">
+          <h3>Choose a Template</h3>
+          <div class="template-options">
+            <div class="template-option active" data-template="professional">
+              <img src="/images/template-professional.png" alt="Professional Template">
+              <span>Professional</span>
+            </div>
+            <div class="template-option" data-template="modern">
+              <img src="/images/template-modern.png" alt="Modern Template">
+              <span>Modern</span>
+            </div>
+            <div class="template-option" data-template="creative">
+              <img src="/images/template-creative.png" alt="Creative Template">
+              <span>Creative</span>
+            </div>
+            <div class="template-option" data-template="simple">
+              <img src="/images/template-simple.png" alt="Simple Template">
+              <span>Simple</span>
+            </div>
+          </div>
+        </div>
+        
+        <div class="sections-nav">
+          <h3>Sections</h3>
+          <ul>
+            <li class="active" data-section="personal"><span>Personal Information</span></li>
+            <li data-section="profile"><span>Professional Profile</span></li>
+            <li data-section="experience"><span>Work Experience</span></li>
+            <li data-section="education"><span>Education</span></li>
+            <li data-section="skills"><span>Skills</span></li>
+            <li data-section="languages"><span>Languages</span></li>
+            <li data-section="references"><span>References</span></li>
+          </ul>
+          <button class="add-section-btn">+ Add Section</button>
+        </div>
+      </div>
+      
+      <div class="builder-content">
+        <div class="section-editor" id="personal-section">
+          <h2>Personal Information</h2>
+          <div class="form-group">
+            <label for="fullName">Full Name</label>
+            <input type="text" id="fullName" name="fullName" placeholder="e.g., John Smith">
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="jobTitle">Job Title</label>
+              <input type="text" id="jobTitle" name="jobTitle" placeholder="e.g., Marketing Manager">
+            </div>
+            <div class="form-group">
+              <label for="location">Location</label>
+              <input type="text" id="location" name="location" placeholder="e.g., New York, NY">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="email">Email</label>
+              <input type="email" id="email" name="email" placeholder="e.g., john.smith@example.com">
+            </div>
+            <div class="form-group">
+              <label for="phone">Phone</label>
+              <input type="tel" id="phone" name="phone" placeholder="e.g., (555) 123-4567">
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="linkedin">LinkedIn (Optional)</label>
+            <input type="url" id="linkedin" name="linkedin" placeholder="e.g., linkedin.com/in/johnsmith">
+          </div>
+        </div>
+        
+        <!-- Other sections would be here but hidden initially -->
+        <div class="section-editor hidden" id="profile-section">
+          <h2>Professional Profile</h2>
+          <div class="form-group">
+            <label for="profileSummary">Summary</label>
+            <textarea id="profileSummary" name="profileSummary" rows="5" placeholder="Write a brief summary of your professional background and key strengths..."></textarea>
+          </div>
+        </div>
+        
+        <div class="section-editor hidden" id="experience-section">
+          <h2>Work Experience</h2>
+          <div class="experience-item">
+            <div class="form-group">
+              <label for="jobTitle1">Job Title</label>
+              <input type="text" id="jobTitle1" name="jobTitle1" placeholder="e.g., Marketing Manager">
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="employer1">Employer</label>
+                <input type="text" id="employer1" name="employer1" placeholder="e.g., ABC Company">
+              </div>
+              <div class="form-group">
+                <label for="location1">Location</label>
+                <input type="text" id="location1" name="location1" placeholder="e.g., New York, NY">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="startDate1">Start Date</label>
+                <input type="month" id="startDate1" name="startDate1">
+              </div>
+              <div class="form-group">
+                <label for="endDate1">End Date</label>
+                <input type="month" id="endDate1" name="endDate1">
+                <div class="checkbox-group">
+                  <input type="checkbox" id="currentJob1" name="currentJob1">
+                  <label for="currentJob1">I currently work here</label>
+                </div>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="jobDescription1">Description</label>
+              <textarea id="jobDescription1" name="jobDescription1" rows="4" placeholder="Describe your responsibilities and achievements..."></textarea>
+            </div>
+          </div>
+          <button class="add-item-btn">+ Add Another Position</button>
+        </div>
+      </div>
+      
+      <div class="builder-preview">
+        <div class="preview-header">
+          <h3>Preview</h3>
+          <div class="preview-actions">
+            <button class="preview-btn" id="downloadPDF">Download PDF</button>
+            <button class="preview-btn" id="downloadDOCX">Download DOCX</button>
+          </div>
+        </div>
+        <div class="resume-preview-container">
+          <div class="resume-preview-document" id="resumePreview">
+            <!-- Resume preview will be dynamically generated here -->
+            <div class="resume-header">
+              <h1 id="previewName">Your Name</h1>
+              <p id="previewJobTitle">Your Job Title</p>
+              <div class="contact-info">
+                <span id="previewEmail">email@example.com</span> |
+                <span id="previewPhone">(555) 123-4567</span> |
+                <span id="previewLocation">City, State</span>
+              </div>
+            </div>
+            <div class="resume-section" id="previewProfile">
+              <h2>Professional Profile</h2>
+              <p>Your professional summary will appear here...</p>
+            </div>
+            <div class="resume-section" id="previewExperience">
+              <h2>Work Experience</h2>
+              <div class="experience-entry">
+                <div class="job-header">
+                  <h3>Job Title</h3>
+                  <span class="job-date">Month Year - Present</span>
+                </div>
+                <p class="job-company">Company Name, Location</p>
+                <p class="job-description">Your job description will appear here...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+  
+  <script src="/scripts/builder.js"></script>
+</body>
+</html>

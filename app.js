@@ -49,6 +49,15 @@ app.get("/jobs",(req,res)=>{
     });
 })
 
+app.get("/resumeBuilder",(req,res)=>{
+    res.render("resume-builder");
+})
+
+app.get("/builder",(req,res)=>{
+    res.render("builder");
+})
+
+
 // Job filter endpoint
 app.post("/JobFilter", async (req, res) => {
     const jobsPerPage = 9;

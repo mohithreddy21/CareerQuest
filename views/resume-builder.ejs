@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Resume Builder | Resume.io Clone</title>
+  <link rel="stylesheet" href="/styles/resume-builder.css">
+  <link rel="stylesheet" href="/styles/home.css">
+  <link rel="icon" href="/images/favicon.ico">
+</head>
+<body>
+  <%- include('partials/navbar') %>
+  
+  <main>
+    <section class="hero">
+      <div class="container hero-container">
+        <div class="hero-content">
+
+          <h1>Write your story with the ultimate resume builder</h1>
+          
+          <p class="hero-subtitle">Only 2% of resumes win. Yours will be one of them. Let's build you a resume that works.</p>
+          
+          <div class="cta-buttons">
+            <a href="/builder" class="cta-button primary">Create my resume</a>
+            <a href="/upload" class="cta-button secondary">Upload my resume</a>
+          </div>
+          
+          <div class="stats-container">
+            <div class="stat-box">
+              <div class="stat-number">39%</div>
+              <div class="stat-text">more likely to get hired</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-number">8%</div>
+              <div class="stat-text">better pay with your next job</div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="hero-image">
+          <div class="resume-preview">
+            <div class="editor-toolbar">
+              <button class="tool-btn bold"><i class="icon-bold">B</i></button>
+              <button class="tool-btn italic"><i class="icon-italic">I</i></button>
+              <button class="tool-btn underline"><i class="icon-underline">U</i></button>
+              <button class="tool-btn strikethrough"><i class="icon-strikethrough">S</i></button>
+              <span class="divider"></span>
+              <button class="tool-btn bullet-list"><i class="icon-list-bullet">•</i></button>
+              <button class="tool-btn numbered-list"><i class="icon-list-numbered">1.</i></button>
+              <button class="tool-btn link"><i class="icon-link">🔗</i></button>
+              <button class="tool-btn text-color"><i class="icon-palette">🎨</i></button>
+            </div>
+            
+            <div class="resume-document">
+              <img src="/images/resume-preview.png" alt="Resume Preview" class="resume-preview-img">
+            </div>
+            
+            <div class="export-options">
+              <button class="export-btn">Export to DOCX</button>
+              <button class="export-btn">Export to TXT</button>
+              <button class="export-btn">Share a link</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+  
+  <%- include('partials/footer') %>
+  
+  <script src="/scripts/resume-builder.js"></script>
+</body>
+</html>
