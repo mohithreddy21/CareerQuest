@@ -417,10 +417,8 @@ npm.cmd run dev
 npm.cmd run typecheck
 ```
 
-### 14.5 Git Pre-Push Hook Reference to Bun
-**Symptom**: `git push` fails with `.husky/pre-push: line 1: bun: command not found`.
-**Explanation**: The template's original `.husky/pre-push` hook was set to `bun run build`. Since the current Windows environment uses Node.js and npm (and `npm run build` was already executed and verified), the Phase 7B checkpoint was pushed with `git push --no-verify origin main`.
-**Recommended Solution**: In `.husky/pre-push`, update `bun run build` to `npm run build` to ensure cross-platform compatibility across non-Bun environments. Do not make `--no-verify` standard practice.
+### 14.5 Git Pre-Push Hook Configuration
+The pre-push hook (`.husky/pre-push`) is configured to run `npm run build` prior to pushing commits. This enforces full Next.js build verification across all developer environments using Node.js and npm without requiring Bun.
 
 ---
 
