@@ -1,5 +1,8 @@
 import { Icons } from '@/components/icons';
 
+export * from './domain';
+export * from './workspace';
+
 export interface PermissionCheck {
   permission?: string;
   plan?: string;

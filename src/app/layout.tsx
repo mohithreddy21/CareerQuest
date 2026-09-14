@@ -1,3 +1,4 @@
+import { ClerkProvider } from '@clerk/nextjs';
 import Providers from '@/components/layout/providers';
 import { Toaster } from '@/components/ui/sonner';
 import { fontVariables } from '@/components/themes/font.config';
@@ -20,32 +21,23 @@ export const metadata: Metadata = {
     ? { metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL) }
     : {}),
   title: {
-    default: 'Shadcn Dashboard - Next.js Admin Dashboard Template',
-    template: '%s | Shadcn Dashboard'
+    default: 'CareerQuest - AI Job Discovery & Application Assistant',
+    template: '%s | CareerQuest'
   },
   description:
-    'Free, open source admin dashboard starter built with Next.js 16, shadcn/ui, Tailwind CSS, and TypeScript.',
+    'AI-powered job-search workspace for discovering, analyzing, tailoring, and tracking job applications.',
   openGraph: {
-    title: 'Shadcn Dashboard - Next.js Admin Dashboard Template',
+    title: 'CareerQuest - AI Job Discovery & Application Assistant',
     description:
-      'Free, open source admin dashboard starter built with Next.js 16, shadcn/ui, Tailwind CSS, and TypeScript.',
-    siteName: 'Shadcn Dashboard',
-    type: 'website',
-    images: [
-      {
-        url: '/shadcn-dashboard.png',
-        width: 3200,
-        height: 1600,
-        alt: 'Shadcn Dashboard overview page'
-      }
-    ]
+      'AI-powered job-search workspace for discovering, analyzing, tailoring, and tracking job applications.',
+    siteName: 'CareerQuest',
+    type: 'website'
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Shadcn Dashboard - Next.js Admin Dashboard Template',
+    title: 'CareerQuest - AI Job Discovery & Application Assistant',
     description:
-      'Free, open source admin dashboard starter built with Next.js 16, shadcn/ui, Tailwind CSS, and TypeScript.',
-    images: ['/shadcn-dashboard.png']
+      'AI-powered job-search workspace for discovering, analyzing, tailoring, and tracking job applications.'
   }
 };
 
@@ -59,7 +51,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const isValidTheme = THEMES.some((t) => t.value === activeThemeValue);
   const themeToApply = isValidTheme ? activeThemeValue! : DEFAULT_THEME;
 
-  return (
+  const content = (
     <html lang='en' suppressHydrationWarning data-theme={themeToApply}>
       <head>
         <script
@@ -99,4 +91,15 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       </body>
     </html>
   );
+
+  const hasClerkKey = Boolean(
+    process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY &&
+    !process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY.includes('example')
+  );
+
+  if (hasClerkKey) {
+    return <ClerkProvider>{content}</ClerkProvider>;
+  }
+
+  return content;
 }

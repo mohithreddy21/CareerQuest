@@ -10,16 +10,28 @@ type BreadcrumbItem = {
 
 // This allows to add custom title as well
 const routeMapping: Record<string, BreadcrumbItem[]> = {
-  '/dashboard': [{ title: 'Dashboard', link: '/dashboard' }],
-  '/dashboard/employee': [
-    { title: 'Dashboard', link: '/dashboard' },
-    { title: 'Employee', link: '/dashboard/employee' }
+  '/dashboard': [{ title: 'Dashboard', link: '/dashboard/overview' }],
+  '/dashboard/overview': [{ title: 'Dashboard', link: '/dashboard/overview' }],
+  '/dashboard/discover': [
+    { title: 'Dashboard', link: '/dashboard/overview' },
+    { title: 'Discover Jobs', link: '/dashboard/discover' }
   ],
-  '/dashboard/product': [
-    { title: 'Dashboard', link: '/dashboard' },
-    { title: 'Product', link: '/dashboard/product' }
+  '/dashboard/applications': [
+    { title: 'Dashboard', link: '/dashboard/overview' },
+    { title: 'Applications', link: '/dashboard/applications' }
+  ],
+  '/dashboard/resume': [
+    { title: 'Dashboard', link: '/dashboard/overview' },
+    { title: 'Resume & Profile', link: '/dashboard/resume' }
+  ],
+  '/dashboard/settings': [
+    { title: 'Dashboard', link: '/dashboard/overview' },
+    { title: 'Settings', link: '/dashboard/settings' }
+  ],
+  '/dashboard/notifications': [
+    { title: 'Dashboard', link: '/dashboard/overview' },
+    { title: 'Notifications', link: '/dashboard/notifications' }
   ]
-  // Add more custom mappings as needed
 };
 
 export function useBreadcrumbs() {

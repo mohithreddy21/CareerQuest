@@ -12,6 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
+import { useRouter } from 'next/navigation';
 import {
   SidebarMenu,
   SidebarMenuButton,
@@ -28,6 +29,7 @@ export function NavUser({
     avatar: string;
   };
 }) {
+  const router = useRouter();
   const { isMobile } = useSidebar();
 
   return (
@@ -72,24 +74,16 @@ export function NavUser({
                 </div>
               </DropdownMenuLabel>
             </DropdownMenuGroup>
-            <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem>
-                <Icons.sparkles className='mr-2 h-4 w-4' />
-                Upgrade to Pro
+              <DropdownMenuItem onClick={() => router.push('/dashboard/resume')}>
+                <Icons.profile className='mr-2 h-4 w-4' />
+                Profile & Resume
               </DropdownMenuItem>
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuGroup>
-              <DropdownMenuItem>
-                <Icons.circleCheck className='mr-2 h-4 w-4' />
-                Account
+              <DropdownMenuItem onClick={() => router.push('/dashboard/settings')}>
+                <Icons.settings className='mr-2 h-4 w-4' />
+                Settings
               </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Icons.creditCard className='mr-2 h-4 w-4' />
-                Billing
-              </DropdownMenuItem>
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push('/dashboard/notifications')}>
                 <Icons.notification className='mr-2 h-4 w-4' />
                 Notifications
               </DropdownMenuItem>

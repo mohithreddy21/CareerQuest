@@ -1,0 +1,528 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// -----------------------------------------------------------------------------
+// 1. Candidate Identity, Profile & Preferences
+// -----------------------------------------------------------------------------
+
+/// Canonical workspace identity keyed by Clerk userId
+model Candidate {
+  id          String   @id @default(cuid())
+  clerkUserId String   @unique
+  email       String   @unique
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // 1:1 Presentation profile & search preferences
+  profile     CandidateProfile?
+  preferences CandidatePreferences?
+
+  // Domain associations (Candidate-owned cascading data)
+  knowledgeItems    KnowledgeItem[]
+  documents         CandidateDocument[]
+  ingestionBatches  ResumeIngestionBatch[]
+  resumes           ResumeVersion[]
+  applications      Application[]
+  applicationEvents ApplicationEvent[]
+  matches           JobMatch[]
+  exports           ResumeExportRecord[]
+
+  // Privately imported jobs (nullified if candidate is removed; does not delete shared jobs)
+  importedJobs Job[] @relation("CandidateImportedJobs")
+
+  // Phase 7 Discovery & Intelligence
+  candidateJobStates CandidateJobState[]
+  savedSearches      SavedSearch[]
+
+  @@index([clerkUserId])
+  @@index([email])
+}
+
+/// Presentation and contact details ONLY.
+/// Invariant: Career facts belong exclusively to KnowledgeItem.
+model CandidateProfile {
+  id                  String   @id @default(cuid())
+  candidateId         String   @unique
+  name                String
+  phone               String?
+  location            String
+  professionalSummary String   @db.Text
+  headline            String?
+  masterResumeId      String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  candidate Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+}
+
+/// Candidate job search preferences and parameters
+model CandidatePreferences {
+  id                 String   @id @default(cuid())
+  candidateId        String   @unique
+  targetRoles        String[]
+  preferredLocations String[]
+  workArrangements   String[]
+  targetSalaryMin    Int?
+  currency           String   @default("USD")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  candidate Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+}
+
+// -----------------------------------------------------------------------------
+// 2. Candidate Knowledge Bank & Provenance Ledger
+// -----------------------------------------------------------------------------
+
+/// The single source of truth for all verified and proposed candidate career facts.
+/// Categories: 'skill', 'experience', 'project', 'education', 'certification', 'achievement'
+model KnowledgeItem {
+  id          String   @id @default(cuid())
+  candidateId String
+  category    String
+  content     Json
+  status      String   @default("approved") // 'proposed', 'approved', 'rejected', 'archived'
+  version     Int      @default(1)          // Optimistic concurrency protection
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  candidate  Candidate             @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  provenance KnowledgeProvenance[]
+
+  @@index([candidateId, category])
+  @@index([candidateId, status])
+}
+
+/// Provenance trace linking approved/proposed knowledge back to source documents or entries
+model KnowledgeProvenance {
+  id              String   @id @default(cuid())
+  knowledgeItemId String
+  sourceType      String   // 'manual_entry', 'resume_upload', 'profile_migration', 'external_import'
+  sourceLabel     String
+  documentId      String?
+  extractedSnippet String? @db.Text
+  confidence      Float?
+  addedAt         DateTime @default(now())
+
+  knowledgeItem KnowledgeItem      @relation(fields: [knowledgeItemId], references: [id], onDelete: Cascade)
+  document      CandidateDocument? @relation(fields: [documentId], references: [id], onDelete: SetNull)
+
+  @@index([knowledgeItemId])
+  @@index([documentId])
+}
+
+/// Uploaded source documents (resumes, transcripts) preserving provenance and hash
+model CandidateDocument {
+  id               String   @id @default(cuid())
+  candidateId      String
+  filename         String
+  mimeType         String
+  size             Int
+  storageKey       String
+  hash             String   // SHA-256 for dedup and integrity check
+  uploadedAt       DateTime @default(now())
+  processingStatus String   @default("uploaded") // 'uploaded', 'processing', 'parsed', 'reviewed', 'failed'
+
+  candidate        Candidate              @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  ingestionBatches ResumeIngestionBatch[]
+  provenanceItems  KnowledgeProvenance[]
+
+  @@index([candidateId])
+  @@index([hash])
+}
+
+/// Ephemeral parsing batch for candidate review.
+/// Invariant: rawText is nullable and can be expunged after review.
+model ResumeIngestionBatch {
+  id          String    @id @default(cuid())
+  candidateId String
+  documentId  String?
+  fileName    String
+  rawText     String?   @db.Text
+  status      String    @default("pending_review") // 'pending_review', 'resolved'
+  items       Json      // ProposedKnowledgeItem[]
+  uploadedAt  DateTime  @default(now())
+  resolvedAt  DateTime?
+
+  candidate Candidate          @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  document  CandidateDocument? @relation(fields: [documentId], references: [id], onDelete: SetNull)
+
+  @@index([candidateId, status])
+}
+
+// -----------------------------------------------------------------------------
+// 3. Jobs, Analysis & Decision Support Matching
+// -----------------------------------------------------------------------------
+
+/// Canonical job opportunity catalog
+model Job {
+  id                     String    @id @default(cuid())
+  title                  String
+  company                String
+  location               String
+  workArrangement        String    // 'remote' | 'hybrid' | 'onsite' | 'unknown'
+  description            String    @db.Text
+  responsibilities       String[]
+  requiredSkills         String[]
+  preferredSkills        String[]
+  experienceRequirement  String?
+  educationRequirement   String?
+  salaryMin              Int?
+  salaryMax              Int?
+  salaryCurrency         String?   // ISO currency code or null (Unknown != USD)
+  salaryInterval         String?   @default("yearly")
+  postedDate             DateTime?
+  source                 String    // 'linkedin', 'indeed', 'url_import', 'manual'
+  originalUrl            String?
+  normalizedAt           DateTime  @default(now())
+  duplicateGroupId       String?
+  jobStatus              String    @default("active") // 'active', 'archived', 'duplicate'
+  isPublic               Boolean   @default(true)
+  importedByCandidateId  String?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  importedBy       Candidate?           @relation("CandidateImportedJobs", fields: [importedByCandidateId], references: [id], onDelete: SetNull)
+  analysis         JobAnalysis?
+  matches          JobMatch[]
+  resumes          ResumeVersion[]
+  applications     Application[]
+  events           ApplicationEvent[]
+  sourceReferences JobSourceReference[]
+  candidateStates  CandidateJobState[]
+
+  @@index([jobStatus, isPublic])
+  @@index([importedByCandidateId])
+  @@index([company])
+  @@index([duplicateGroupId])
+  @@index([postedDate])
+}
+
+/// Structured job analysis with extraction versioning
+model JobAnalysis {
+  id                    String   @id @default(cuid())
+  jobId                 String   @unique
+  seniority             String   // 'entry', 'mid', 'senior', 'lead', 'executive'
+  roleCategory          String
+  technicalRequirements String[]
+  softSkills            String[]
+  importantKeywords     String[]
+  extractedRequirements Json     // ExtractedRequirement[]
+  analysisStatus        String   @default("idle") // 'idle', 'processing', 'success', 'error'
+  analysisVersion       String   @default("1.0")  // Extraction version tracking
+  analyzedAt            DateTime @default(now())
+
+  job Job @relation(fields: [jobId], references: [id], onDelete: Cascade)
+}
+
+/// Candidate match decision support record with algorithm versioning
+model JobMatch {
+  id                          String   @id @default(cuid())
+  jobId                       String
+  candidateId                 String
+  score                       Int      // 0-100
+  recommendation              String   // 'strong', 'good', 'moderate', 'low'
+  headline                    String
+  reasoning                   String   @db.Text
+  strongMatches               Json     // MatchPoint[]
+  partialMatches              Json     // MatchPoint[]
+  missingRequirements         Json     // MatchPoint[]
+  supportingCandidateEvidence Json     // CandidateEvidencePoint[]
+  matchAlgorithmVersion       String   @default("1.0") // Score reproducible version
+  calculatedAt                DateTime @default(now())
+
+  candidate Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  job       Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  // Exactly one active match calculation per candidate per job
+  @@unique([candidateId, jobId])
+  @@index([candidateId, score])
+}
+
+// -----------------------------------------------------------------------------
+// 3B. Job Discovery, Multi-Source References & Candidate State (Phase 7)
+// -----------------------------------------------------------------------------
+
+/// External listing & source representation (Many-to-one with Job)
+model JobSourceReference {
+  id                    String    @id @default(cuid())
+  jobId                 String
+  source                String    // 'greenhouse' | 'lever' | 'linkedin' | 'indeed' | 'company_portal' | 'manual' | 'url_import'
+  sourceJobId           String?   // External ATS requisition ID
+  sourceUrl             String    @db.Text // Original unmodified URL for audit
+  normalizedUrl         String    @db.Text // Canonical URL for deduplication/uniqueness
+  sourceStatus          String    @default("active") // 'active' | 'closed' | 'unknown'
+  verificationStatus    String    @default("unverified") // 'verified_accessible' | 'verification_failed' | 'unverified'
+  lastVerifiedAt        DateTime?
+  lastVerificationError String?   @db.Text
+  isPrimary             Boolean   @default(false)
+  referenceRole         String    @default("primary") // 'primary' | 'alternative'
+  firstSeenAt           DateTime  @default(now())
+  lastSeenAt            DateTime  @default(now())
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  job Job @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@unique([source, normalizedUrl])
+  @@index([jobId, sourceStatus, verificationStatus])
+  @@index([jobId, isPrimary])
+  @@index([normalizedUrl])
+}
+
+/// Candidate discovery interaction & triage state
+model CandidateJobState {
+  id              String    @id @default(cuid())
+  candidateId     String
+  jobId           String
+  status          String    @default("UNSEEN") // 'UNSEEN' | 'VIEWED' | 'SAVED' | 'DISMISSED'
+  dismissedReason String?   // 'compensation' | 'location' | 'qualification' | 'not_interested' | 'other'
+  firstViewedAt   DateTime?
+  savedAt         DateTime?
+  dismissedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  candidate Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  job       Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@unique([candidateId, jobId])
+  @@index([candidateId, status])
+  @@index([jobId])
+}
+
+/// Candidate-owned saved discovery query
+model SavedSearch {
+  id               String    @id @default(cuid())
+  candidateId      String
+  name             String
+  query            String?
+  locations        String[]
+  workArrangements String[]  // 'remote', 'hybrid', 'onsite'
+  roleCategories   String[]
+  seniorityLevels  String[]
+  minSalary        Int?
+  currency         String?   // ISO currency code or null (Unknown != USD)
+  alertFrequency   String    @default("weekly") // 'instant' | 'daily' | 'weekly' | 'never'
+  filterVersion    String    @default("1.0")
+  lastExecutedAt   DateTime?
+  lastMatchCount   Int       @default(0)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  candidate Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@index([candidateId, createdAt])
+}
+
+// -----------------------------------------------------------------------------
+// 4. Resume Tailoring, Content Versions & Change Ledger
+// -----------------------------------------------------------------------------
+
+/// Master and tailored resume versions with lock protection
+model ResumeVersion {
+  id             String   @id @default(cuid())
+  candidateId    String
+  masterResumeId String?
+  jobId          String?
+  targetCompany  String?
+  title          String
+  targetRole     String
+  summary        String   @db.Text
+  experience     Json     // CandidateExperience[]
+  education      Json     // CandidateEducation[]
+  skills         Json     // CandidateSkills
+  projects       Json     // CandidateProject[]
+  certifications Json     // CandidateCertification[]
+  approvalState  String   @default("draft") // 'draft', 'in_review', 'approved'
+  isLocked       Boolean  @default(false)   // Invariant: Once applied, cannot be mutated
+  version        Int      @default(1)       // Optimistic concurrency
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  candidate Candidate      @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  job       Job?           @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  changes   ResumeChange[]
+
+  // Applications referencing this resume version (protected by onDelete: Restrict on Application)
+  applications Application[]
+  exports      ResumeExportRecord[]
+
+  @@index([candidateId, jobId])
+  @@index([candidateId, approvalState])
+}
+
+/// Grounded change audit trail for resume tailoring
+model ResumeChange {
+  id                      String   @id @default(cuid())
+  resumeVersionId         String
+  candidateId             String?
+  jobId                   String?
+  section                 String   // 'summary', 'experience', 'skills', 'projects'
+  sectionItemId           String?
+  originalContent         String   @db.Text
+  proposedContent         String   @db.Text
+  editedContent           String?  @db.Text
+  rationale               String   @db.Text
+  jobRequirement          String   @db.Text
+  sourceCandidateEvidence String   @db.Text
+  sourceKnowledgeItemIds  String[]
+  evidenceReferences      String[]
+  status                  String   @default("pending") // 'pending', 'approved', 'rejected', 'edited'
+  grounded                Boolean  @default(true)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  resumeVersion ResumeVersion @relation(fields: [resumeVersionId], references: [id], onDelete: Cascade)
+
+  @@index([resumeVersionId, section])
+}
+
+// -----------------------------------------------------------------------------
+// 5. Application Tracking Pipeline, Historical Snapshots & Audit Ledger
+// -----------------------------------------------------------------------------
+
+/// Central opportunity application record.
+/// Invariant: MUST NOT have a unique constraint on (candidateId, jobId) to support re-applications.
+/// Invariant: Stores immutable resumeSnapshot JSON for permanent historical reproducibility.
+model Application {
+  id                      String    @id @default(cuid())
+  candidateId             String
+  jobId                   String
+  status                  String    @default("discovered")
+  dateDiscovered          DateTime  @default(now())
+  dateApplied             DateTime?
+  dateClosed              DateTime?
+  isArchived              Boolean   @default(false)
+  notes                   String?   @db.Text
+
+  // Historical snapshots & references
+  resumeVersionId         String?
+  tailoredResumeVersionId String?
+  selectedTemplateId      String?
+  selectedTemplateVersion String?
+  matchScoreAtApplication Int?
+  resumeSnapshot          Json?     // Frozen ResumeContent JSON captured at confirmation
+
+  // Prepared application materials
+  coverLetter             String?   @db.Text
+  coverLetterData         Json?     // GroundedCoverLetter
+  applicationAnswers      Json?     // ApplicationAnswer[]
+  preparedQuestions       Json?     // GroundedApplicationQuestion[]
+
+  // Active follow-up state
+  followUpDate            String?   // YYYY-MM-DD
+  followUpStatus          String    @default("none") // 'none', 'pending', 'completed', 'snoozed'
+  followUpNote            String?
+
+  // Lifecycle audit history & optimistic concurrency
+  statusHistory           Json      // StatusHistoryEntry[]
+  version                 Int       @default(1)
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  candidate               Candidate              @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  job                     Job                    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  // Restrict onDelete: Prevents deletion of a resume version if an application references it
+  tailoredResumeVersion   ResumeVersion?         @relation(fields: [tailoredResumeVersionId], references: [id], onDelete: Restrict)
+
+  events                  ApplicationEvent[]
+  interviewStages         InterviewStage[]
+  contacts                ApplicationContact[]
+  exports                 ResumeExportRecord[]
+
+  // Notice: NO @@unique([candidateId, jobId])! Repeat applications are permitted.
+  @@index([candidateId, status])
+  @@index([candidateId, jobId])
+  @@index([tailoredResumeVersionId])
+}
+
+/// Append-only application activity ledger.
+/// Invariant: Server-generated timestamp, create-only, candidate-isolated, immutable evidence.
+model ApplicationEvent {
+  id            String   @id @default(cuid())
+  candidateId   String
+  applicationId String
+  jobId         String
+  type          String   // ApplicationEventType
+  title         String
+  description   String
+  timestamp     DateTime @default(now())
+  isAutomated   Boolean  @default(false)
+  metadata      Json?
+
+  candidate   Candidate   @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  job         Job         @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId, timestamp])
+  @@index([candidateId, timestamp])
+}
+
+/// Interview round tracking for an active application
+model InterviewStage {
+  id               String    @id @default(cuid())
+  applicationId    String
+  stageName        String
+  scheduledDate    DateTime?
+  completedDate    DateTime?
+  interviewerNames String[]
+  meetingLink      String?
+  location         String?
+  notes            String?   @db.Text
+  status           String    @default("scheduled") // 'scheduled', 'completed', 'cancelled'
+  outcome          String?   // 'passed', 'failed', 'inconclusive', 'pending'
+  feedback         String?   @db.Text
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId, status])
+}
+
+/// Key recruiter and hiring manager contacts
+model ApplicationContact {
+  id            String   @id @default(cuid())
+  applicationId String
+  name          String
+  role          String
+  email         String?
+  phone         String?
+  linkedInUrl   String?
+  notes         String?  @db.Text
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId])
+}
+
+/// Exported artifact metadata ledger (PDF / DOCX)
+model ResumeExportRecord {
+  id                      String   @id @default(cuid())
+  candidateId             String
+  applicationId           String?
+  tailoredResumeVersionId String
+  templateId              String
+  templateVersion         String
+  format                  String   // 'pdf', 'docx'
+  filename                String
+  storageKey              String?
+  createdAt               DateTime @default(now())
+
+  candidate             Candidate     @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  application           Application?  @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+  tailoredResumeVersion ResumeVersion @relation(fields: [tailoredResumeVersionId], references: [id], onDelete: Restrict)
+
+  @@index([candidateId])
+  @@index([applicationId])
+  @@index([tailoredResumeVersionId])
+}

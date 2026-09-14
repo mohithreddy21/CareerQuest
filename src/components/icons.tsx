@@ -2,6 +2,7 @@ import {
   IconAdjustmentsHorizontal,
   IconAlertCircle,
   IconAlertTriangle,
+  IconArchive,
   IconArrowRight,
   IconBell,
   IconBold,
@@ -31,6 +32,7 @@ import {
   IconDeviceLaptop,
   IconDots,
   IconDotsVertical,
+  IconDownload,
   IconEdit,
   IconExternalLink,
   IconEyeOff,
@@ -63,6 +65,7 @@ import {
   IconPizza,
   IconPlus,
   IconProps,
+  IconRefresh,
   IconRosetteDiscountCheck,
   IconSearch,
   IconSelector,
@@ -95,6 +98,7 @@ export type Icon = React.ComponentType<IconProps>;
 export const Icons = {
   // General
   alertCircle: IconAlertCircle,
+  archive: IconArchive,
   warning: IconAlertTriangle,
   arrowRight: IconArrowRight,
   check: IconCheck,
@@ -162,8 +166,11 @@ export const Icons = {
 
   // Actions
   add: IconPlus,
+  copy: IconClipboardText,
   edit: IconEdit,
+  download: IconDownload,
   upload: IconUpload,
+  refresh: IconRefresh,
   share: IconShare,
   login: IconLogin,
   logout: IconLogout,
@@ -189,6 +196,7 @@ export const Icons = {
   product: IconBox,
   pro: IconCrown,
   exclusive: IconStar,
+  star: IconStar,
   sparkles: IconSparkles,
   badgeCheck: IconRosetteDiscountCheck,
   lock: IconLock,

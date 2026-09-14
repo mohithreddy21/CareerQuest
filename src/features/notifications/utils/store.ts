@@ -23,14 +23,14 @@ type NotificationState = {
 const mockNotifications: Notification[] = [
   {
     id: '1',
-    title: 'New team member joined',
-    body: 'Sarah Connor has joined the Engineering workspace.',
+    title: 'High match opportunity discovered',
+    body: 'Senior Full-Stack Engineer at Stripe (94% match) has been added to your discovery feed.',
     status: 'unread',
-    createdAt: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
+    createdAt: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
     actions: [
       {
-        id: 'view',
-        label: 'View workspace',
+        id: 'view-job',
+        label: 'View job',
         type: 'redirect',
         style: 'primary'
       }
@@ -38,14 +38,14 @@ const mockNotifications: Notification[] = [
   },
   {
     id: '2',
-    title: 'New product added',
-    body: 'A new product "Dashboard Pro" has been added to the catalog.',
+    title: 'Interview confirmed',
+    body: 'Technical screening scheduled with Linear for Senior Platform Engineer.',
     status: 'unread',
-    createdAt: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
     actions: [
       {
-        id: 'view-product',
-        label: 'View products',
+        id: 'view-application',
+        label: 'View application',
         type: 'redirect',
         style: 'primary'
       }
@@ -53,14 +53,14 @@ const mockNotifications: Notification[] = [
   },
   {
     id: '3',
-    title: 'Billing cycle updated',
-    body: 'Your Pro plan has been renewed. Next invoice on April 24, 2026.',
+    title: 'Resume tailoring ready',
+    body: 'Targeted resume draft prepared for Stripe Senior Full-Stack role.',
     status: 'unread',
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(),
     actions: [
       {
-        id: 'billing',
-        label: 'View billing',
+        id: 'view-resume',
+        label: 'Review resume',
         type: 'redirect',
         style: 'primary'
       }
@@ -68,29 +68,14 @@ const mockNotifications: Notification[] = [
   },
   {
     id: '4',
-    title: 'Task assigned to you',
-    body: 'You have been assigned "Update dashboard analytics" on the Kanban board.',
+    title: 'Application follow-up due',
+    body: 'Follow up recommended for Datadog application submitted 7 days ago.',
     status: 'read',
     createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
     actions: [
       {
-        id: 'open',
-        label: 'Open kanban',
-        type: 'redirect',
-        style: 'primary'
-      }
-    ]
-  },
-  {
-    id: '5',
-    title: 'New message from Alex',
-    body: 'Alex sent you a message: "Hey, can we sync on the overview dashboard?"',
-    status: 'read',
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3).toISOString(),
-    actions: [
-      {
-        id: 'open-chat',
-        label: 'Open chat',
+        id: 'view-application',
+        label: 'Open applications',
         type: 'redirect',
         style: 'primary'
       }
