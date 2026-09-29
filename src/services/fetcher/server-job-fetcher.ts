@@ -196,7 +196,7 @@ async function resolveAndValidateHost(
   hostname: string,
   customLookupFn?: (h: string) => Promise<{ address: string; family: number }[]>,
   allowHttpForTesting = false
-): Promise<{ address: string; family: number }> {
+): Promise<{ address: string; family: number }[]> {
   const lowerHost = hostname.toLowerCase();
 
   // Check blocked hostname keywords
@@ -219,16 +219,23 @@ async function resolveAndValidateHost(
         );
       }
     }
-    return { address: hostname, family: nodeNet.isIP(hostname) };
+    return [{ address: hostname, family: nodeNet.isIP(hostname) }];
   }
 
-  // DNS resolution
+  // DNS resolution: query both IPv4 and IPv6 families so dual-stack Happy Eyeballs can function
   let addresses: { address: string; family: number }[];
   try {
     if (customLookupFn) {
       addresses = await customLookupFn(hostname);
     } else {
-      addresses = await nodeDns.promises.lookup(hostname, { all: true });
+      const [v4Records, v6Records] = await Promise.all([
+        nodeDns.promises.lookup(hostname, { family: 4, all: true }).catch(() => []),
+        nodeDns.promises.lookup(hostname, { family: 6, all: true }).catch(() => [])
+      ]);
+      addresses = [...v4Records, ...v6Records];
+      if (addresses.length === 0) {
+        addresses = await nodeDns.promises.lookup(hostname, { all: true });
+      }
     }
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -259,8 +266,8 @@ async function resolveAndValidateHost(
     }
   }
 
-  // Pin to the first validated address
-  return addresses[0];
+  // Return all validated addresses for socket pinning
+  return addresses;
 }
 
 /**
@@ -269,7 +276,7 @@ async function resolveAndValidateHost(
  */
 function executePinnedRequest(
   parsedUrl: URL,
-  pinnedTarget: { address: string; family: number },
+  pinnedTargets: { address: string; family: number }[],
   timeoutMs: number,
   maxBytes: number
 ): Promise<{
@@ -282,11 +289,49 @@ function executePinnedRequest(
     const isHttps = parsedUrl.protocol === 'https:';
     const transport = isHttps ? nodeHttps : nodeHttp;
 
-    // Custom agent with socket lookup pinned to the validated IP
+    let lookupInvoked = false;
+    let lookupOptionsReceived: Record<string, unknown> | null = null;
+    let callbackFormUsed: 'array' | 'single' | null = null;
+
+    // Custom agent with socket lookup pinned to the validated IP(s)
     // This guarantees that DNS rebinding attacks cannot redirect the connection to a private IP!
+    // In Node.js (with autoSelectFamily enabled by default), options.all can be true,
+    // requiring an array of { address, family } records in the callback.
+    // Supplying all pre-validated IPs allows Node's Happy Eyeballs to connect reliably (e.g. IPv6 fallback to IPv4).
     const agent = new transport.Agent({
-      lookup: (_hostname, _options, callback) => {
-        callback(null, pinnedTarget.address, pinnedTarget.family);
+      lookup: (_hostname, options, callback) => {
+        lookupInvoked = true;
+        const cb = (typeof options === 'function' ? options : callback) as (
+          err: Error | null,
+          addressOrAddresses?: string | { address: string; family: number }[],
+          family?: number
+        ) => void;
+        const opts = typeof options === 'object' && options !== null ? options : {};
+        lookupOptionsReceived = opts as Record<string, unknown>;
+        if (opts.all) {
+          callbackFormUsed = 'array';
+          let targets = pinnedTargets;
+          if (opts.family === 4) {
+            const v4 = pinnedTargets.filter((t) => t.family === 4);
+            if (v4.length > 0) targets = v4;
+          } else if (opts.family === 6) {
+            const v6 = pinnedTargets.filter((t) => t.family === 6);
+            if (v6.length > 0) targets = v6;
+          }
+          cb(null, targets);
+        } else {
+          callbackFormUsed = 'single';
+          let preferred = pinnedTargets[0];
+          if (opts.family === 4) {
+            preferred = pinnedTargets.find((t) => t.family === 4) || preferred;
+          } else if (opts.family === 6) {
+            preferred = pinnedTargets.find((t) => t.family === 6) || preferred;
+          } else {
+            // Default preference: prefer IPv4 if available
+            preferred = pinnedTargets.find((t) => t.family === 4) || preferred;
+          }
+          cb(null, preferred.address, preferred.family);
+        }
       }
     });
 
@@ -401,29 +446,49 @@ function executePinnedRequest(
       });
     });
 
-    req.on('error', (err) => {
-      clearTimeout(timer);
-      agent.destroy();
-      if (settled) return;
-      settled = true;
+    req.on(
+      'error',
+      (
+        err: Error & { code?: string; cause?: { name?: string; code?: string; message?: string } }
+      ) => {
+        console.error('=== [SERVER_JOB_FETCHER_DIAGNOSTIC] ===');
+        console.error('err.name:', err?.name);
+        console.error('err.code:', err?.code);
+        console.error('err.message:', err?.message);
+        console.error('err.cause?.name:', err?.cause?.name);
+        console.error('err.cause?.code:', err?.cause?.code);
+        console.error('err.cause?.message:', err?.cause?.message);
+        console.error('parsedUrl.hostname:', parsedUrl.hostname);
+        console.error('resolved addresses:', JSON.stringify(pinnedTargets));
+        console.error('options.all:', lookupOptionsReceived?.all);
+        console.error('lookup invoked:', lookupInvoked);
+        console.error('lookup options received:', JSON.stringify(lookupOptionsReceived));
+        console.error('callback form used:', callbackFormUsed);
+        console.error('=== [END_SERVER_JOB_FETCHER_DIAGNOSTIC] ===');
 
-      if (timedOut) {
-        reject(
-          new ServerJobFetcherError(
-            'FETCH_TIMEOUT',
-            `The request timed out after ${timeoutMs / 1000} seconds.`
-          )
-        );
-      } else {
-        reject(
-          new ServerJobFetcherError(
-            'FETCH_FAILED',
-            'Failed to establish connection with the remote server.',
-            err.message
-          )
-        );
+        clearTimeout(timer);
+        agent.destroy();
+        if (settled) return;
+        settled = true;
+
+        if (timedOut) {
+          reject(
+            new ServerJobFetcherError(
+              'FETCH_TIMEOUT',
+              `The request timed out after ${timeoutMs / 1000} seconds.`
+            )
+          );
+        } else {
+          reject(
+            new ServerJobFetcherError(
+              'FETCH_FAILED',
+              'Failed to establish connection with the remote server.',
+              err.message
+            )
+          );
+        }
       }
-    });
+    );
 
     req.end();
   });
@@ -448,14 +513,14 @@ export async function fetchServerJob(
     const parsedUrl = validateUrl(currentUrl, allowHttpForTesting);
 
     // Resolve and validate IP addresses for SSRF protection
-    const resolvedAddress = await resolveAndValidateHost(
+    const resolvedAddresses = await resolveAndValidateHost(
       parsedUrl.hostname,
       options.dnsLookupFn,
       allowHttpForTesting
     );
 
     // Perform the bounded, socket-pinned request
-    const response = await executePinnedRequest(parsedUrl, resolvedAddress, timeoutMs, maxBytes);
+    const response = await executePinnedRequest(parsedUrl, resolvedAddresses, timeoutMs, maxBytes);
 
     // Check for redirect
     if ([301, 302, 303, 307, 308].includes(response.statusCode)) {

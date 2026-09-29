@@ -70,23 +70,25 @@ export function extractResumeContent(
   resume: TailoredResumeVersion,
   candidate?: Partial<CandidateProfile> | null
 ): ResumeContent {
-  const candidateName = candidate?.name || 'Alex Chen';
-  const candidateEmail = candidate?.email || 'alex.chen@example.com';
-  const candidatePhone = candidate?.phone || '+1 (555) 234-5678';
-  const candidateLocation = candidate?.location || 'San Francisco, CA';
+  const candidateName = candidate?.name || 'Candidate';
+  const candidateEmail = candidate?.email || '';
+  const candidatePhone = candidate?.phone || '';
+  const candidateLocation = candidate?.location || '';
+  const candidateLinks =
+    ((candidate as Record<string, unknown> | null | undefined)?.links as {
+      label: string;
+      url: string;
+    }[]) || [];
 
   return {
     identity: {
       fullName: candidateName,
-      targetRole: resume.targetRole || 'Senior Software Engineer',
+      targetRole: resume.targetRole || 'Software Engineer',
       targetCompany: resume.targetCompany || undefined,
       email: candidateEmail,
       phone: candidatePhone,
       location: candidateLocation,
-      links: [
-        { label: 'GitHub', url: 'https://github.com/alexchen' },
-        { label: 'LinkedIn', url: 'https://linkedin.com/in/alexchen' }
-      ]
+      links: candidateLinks.length > 0 ? candidateLinks : undefined
     },
     summary: resume.summary,
     skills: {

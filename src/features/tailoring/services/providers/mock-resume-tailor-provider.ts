@@ -14,14 +14,37 @@ export class MockResumeTailorProvider implements ResumeTailorProvider {
     const candidateId = masterResume.candidateId;
     const resumeVersionId = `res-tailored-${job.id}`;
 
+    // Handle empty candidate knowledge bank gracefully without fabricating unsupported experience
+    if (!retrievedKnowledge.items || retrievedKnowledge.items.length === 0) {
+      if (masterResume.summary) {
+        return [
+          {
+            id: `change-${job.id}-summary`,
+            candidateId,
+            jobId: job.id,
+            resumeVersionId,
+            section: 'summary',
+            originalContent: masterResume.summary,
+            proposedContent: `Professional software engineer pursuing ${job.title} opportunities. Dedicated to high-quality software architecture and collaborative delivery.`,
+            rationale: `Refines summary for ${job.title} at ${job.company} based on candidate profile.`,
+            jobRequirement: `Demonstrated interest in ${job.title}`,
+            sourceCandidateEvidence: 'Candidate master profile summary.',
+            sourceKnowledgeItemIds: [],
+            evidenceReferences: [],
+            status: 'pending',
+            grounded: true
+          }
+        ];
+      }
+      return [];
+    }
+
     // Lookup retrieved knowledge items to attach valid IDs
     const findRetrievedId = (category: string, titleSubstr: string) => {
       const match = retrievedKnowledge.items.find(
         (i) => i.category === category && i.title.toLowerCase().includes(titleSubstr.toLowerCase())
       );
-      return match
-        ? match.knowledgeItemId
-        : retrievedKnowledge.items[0]?.knowledgeItemId || 'kb-exp-1';
+      return match ? match.knowledgeItemId : retrievedKnowledge.items[0]?.knowledgeItemId || '';
     };
 
     const veloceId = findRetrievedId('experience', 'veloce');

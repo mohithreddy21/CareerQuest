@@ -13,6 +13,7 @@ export type Notification = {
 
 type NotificationState = {
   notifications: Notification[];
+  setNotifications: (notifications: Notification[]) => void;
   markAsRead: (id: string) => void;
   markAllAsRead: () => void;
   removeNotification: (id: string) => void;
@@ -20,7 +21,7 @@ type NotificationState = {
   unreadCount: () => number;
 };
 
-const mockNotifications: Notification[] = [
+export const mockNotifications: Notification[] = [
   {
     id: '1',
     title: 'High match opportunity discovered',
@@ -83,40 +84,35 @@ const mockNotifications: Notification[] = [
   }
 ];
 
-export const useNotificationStore = create<NotificationState>()(
-  // To enable persistence across refreshes, uncomment the persist wrapper below:
-  // persist(
-  (set, get) => ({
-    notifications: mockNotifications,
+export const useNotificationStore = create<NotificationState>()((set, get) => ({
+  notifications: [],
 
-    markAsRead: (id) =>
-      set((state) => ({
-        notifications: state.notifications.map((n) =>
-          n.id === id ? { ...n, status: 'read' as const } : n
-        )
-      })),
+  setNotifications: (notifications) => set({ notifications }),
 
-    markAllAsRead: () =>
-      set((state) => ({
-        notifications: state.notifications.map((n) => ({
-          ...n,
-          status: 'read' as const
-        }))
-      })),
+  markAsRead: (id) =>
+    set((state) => ({
+      notifications: state.notifications.map((n) =>
+        n.id === id ? { ...n, status: 'read' as const } : n
+      )
+    })),
 
-    removeNotification: (id) =>
-      set((state) => ({
-        notifications: state.notifications.filter((n) => n.id !== id)
-      })),
+  markAllAsRead: () =>
+    set((state) => ({
+      notifications: state.notifications.map((n) => ({
+        ...n,
+        status: 'read' as const
+      }))
+    })),
 
-    addNotification: (notification) =>
-      set((state) => ({
-        notifications: [{ ...notification, status: 'unread' as const }, ...state.notifications]
-      })),
+  removeNotification: (id) =>
+    set((state) => ({
+      notifications: state.notifications.filter((n) => n.id !== id)
+    })),
 
-    unreadCount: () => get().notifications.filter((n) => n.status === 'unread').length
-  })
-  //   ,
-  //   { name: 'notifications' }
-  // )
-);
+  addNotification: (notification) =>
+    set((state) => ({
+      notifications: [{ ...notification, status: 'unread' as const }, ...state.notifications]
+    })),
+
+  unreadCount: () => get().notifications.filter((n) => n.status === 'unread').length
+}));

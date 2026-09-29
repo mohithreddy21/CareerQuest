@@ -51,6 +51,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const isValidTheme = THEMES.some((t) => t.value === activeThemeValue);
   const themeToApply = isValidTheme ? activeThemeValue! : DEFAULT_THEME;
 
+  const hasClerkKey = Boolean(
+    process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY &&
+    !process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY.includes('example')
+  );
+
   const content = (
     <html lang='en' suppressHydrationWarning data-theme={themeToApply}>
       <head>
@@ -82,7 +87,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             disableTransitionOnChange
             enableColorScheme
           >
-            <Providers activeThemeValue={themeToApply}>
+            <Providers activeThemeValue={themeToApply} hasClerk={hasClerkKey}>
               <Toaster />
               {children}
             </Providers>
@@ -90,11 +95,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         </NuqsAdapter>
       </body>
     </html>
-  );
-
-  const hasClerkKey = Boolean(
-    process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY &&
-    !process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY.includes('example')
   );
 
   if (hasClerkKey) {

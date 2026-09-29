@@ -5,6 +5,7 @@ import {
   addKnowledgeItemAction,
   deleteKnowledgeItemAction,
   ingestResumeAction,
+  uploadAndIngestResumeAction,
   resolveProposedItemAction,
   updateKnowledgeItemAction,
   updateKnowledgeItemStatusAction
@@ -79,5 +80,15 @@ export const acceptAllProposedMutation = mutationOptions({
     const qc = getQueryClient();
     qc.invalidateQueries({ queryKey: knowledgeKeys.all });
     qc.invalidateQueries({ queryKey: resumeKeys.profile() });
+  }
+});
+
+export const uploadAndIngestResumeMutation = mutationOptions({
+  mutationFn: (formData: FormData) => uploadAndIngestResumeAction(formData),
+  onSuccess: () => {
+    const qc = getQueryClient();
+    qc.invalidateQueries({ queryKey: knowledgeKeys.all });
+    qc.invalidateQueries({ queryKey: resumeKeys.profile() });
+    qc.invalidateQueries({ queryKey: ['documents'] });
   }
 });

@@ -1,3 +1,6 @@
+'use server';
+
+import { requireCandidateId } from '@/lib/auth';
 import { careerRepository } from '@/services/career-repository';
 import { resumeReviewService } from '@/features/tailoring/services/resume-review-service';
 import {
@@ -8,25 +11,33 @@ import {
 } from './types';
 
 export async function getCandidateProfile(candidateId?: string): Promise<CandidateProfile> {
-  return careerRepository.getCandidateProfile(candidateId);
+  const resolvedId =
+    candidateId || (await requireCandidateId({ redirectOnUnauthenticated: false }));
+  return careerRepository.getCandidateProfile(resolvedId);
 }
 
 export async function updateCandidateProfile(
   payload: UpdateCandidateProfilePayload,
   candidateId?: string
 ): Promise<CandidateProfile> {
-  return careerRepository.updateCandidateProfile(payload.updates, candidateId);
+  const resolvedId =
+    candidateId || (await requireCandidateId({ redirectOnUnauthenticated: false }));
+  return careerRepository.updateCandidateProfile(payload.updates, resolvedId);
 }
 
 export async function getMasterResume(candidateId?: string): Promise<ResumeVersion | null> {
-  return careerRepository.getMasterResume(candidateId);
+  const resolvedId =
+    candidateId || (await requireCandidateId({ redirectOnUnauthenticated: false }));
+  return careerRepository.getMasterResume(resolvedId);
 }
 
 export async function getTailoredResumeForJob(
   jobId: string,
   candidateId?: string
 ): Promise<ResumeVersion | null> {
-  return resumeReviewService.getOrCreateTailoredResume(jobId, candidateId);
+  const resolvedId =
+    candidateId || (await requireCandidateId({ redirectOnUnauthenticated: false }));
+  return resumeReviewService.getOrCreateTailoredResume(jobId, resolvedId);
 }
 
 export async function updateResumeChangeStatus(

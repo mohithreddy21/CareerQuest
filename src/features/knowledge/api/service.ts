@@ -1,3 +1,6 @@
+'use server';
+
+import { requireCandidateId, assertCandidateOwnership } from '@/lib/auth';
 import {
   AddKnowledgeItemPayload,
   UpdateKnowledgeItemPayload,
@@ -11,20 +14,28 @@ import { knowledgeBankService } from '../services/knowledge-bank-service';
 import { resumeIngestionService } from '../services/resume-ingestion-service';
 
 export async function getKnowledgeBank(candidateId?: string): Promise<CandidateKnowledgeBank> {
-  return knowledgeBankService.getKnowledgeBank(candidateId || 'cand-1');
+  const resolvedId =
+    candidateId || (await requireCandidateId({ redirectOnUnauthenticated: false }));
+  return knowledgeBankService.getKnowledgeBank(resolvedId);
 }
 
 export async function getProposedBatches(candidateId?: string): Promise<ProposedIngestionBatch[]> {
-  return knowledgeBankService.getProposedBatches(candidateId || 'cand-1');
+  const resolvedId =
+    candidateId || (await requireCandidateId({ redirectOnUnauthenticated: false }));
+  return knowledgeBankService.getProposedBatches(resolvedId);
 }
 
 export async function addKnowledgeItem(
   payload: AddKnowledgeItemPayload,
   candidateId?: string
 ): Promise<KnowledgeItem> {
-  const effectiveCandidateId = candidateId || payload.candidateId || 'cand-1';
+  const sessionCandidateId =
+    candidateId || (await requireCandidateId({ redirectOnUnauthenticated: false }));
+  if (payload.candidateId && payload.candidateId !== sessionCandidateId) {
+    assertCandidateOwnership(payload.candidateId, sessionCandidateId);
+  }
   return knowledgeBankService.addKnowledgeItem(
-    effectiveCandidateId,
+    sessionCandidateId,
     payload.category,
     payload.content,
     payload.provenanceLabel
@@ -35,11 +46,13 @@ export async function updateKnowledgeItem(
   payload: UpdateKnowledgeItemPayload,
   candidateId?: string
 ): Promise<KnowledgeItem> {
+  const effectiveCandidateId =
+    candidateId || (await requireCandidateId({ redirectOnUnauthenticated: false }));
   return knowledgeBankService.updateKnowledgeItem(
     payload.id,
     payload.content,
     payload.provenanceNote,
-    candidateId
+    effectiveCandidateId
   );
 }
 
@@ -47,19 +60,31 @@ export async function updateKnowledgeItemStatus(
   payload: UpdateKnowledgeStatusPayload,
   candidateId?: string
 ): Promise<KnowledgeItem> {
-  return knowledgeBankService.updateKnowledgeItemStatus(payload.id, payload.status, candidateId);
+  const effectiveCandidateId =
+    candidateId || (await requireCandidateId({ redirectOnUnauthenticated: false }));
+  return knowledgeBankService.updateKnowledgeItemStatus(
+    payload.id,
+    payload.status,
+    effectiveCandidateId
+  );
 }
 
 export async function deleteKnowledgeItem(id: string, candidateId?: string): Promise<boolean> {
-  return knowledgeBankService.deleteKnowledgeItem(id, candidateId);
+  const effectiveCandidateId =
+    candidateId || (await requireCandidateId({ redirectOnUnauthenticated: false }));
+  return knowledgeBankService.deleteKnowledgeItem(id, effectiveCandidateId);
 }
 
 export async function ingestResume(
   payload: IngestResumePayload,
   candidateId?: string
 ): Promise<ProposedIngestionBatch> {
-  const effectiveCandidateId = candidateId || payload.candidateId || 'cand-1';
-  return resumeIngestionService.ingestResume(effectiveCandidateId, {
+  const sessionCandidateId =
+    candidateId || (await requireCandidateId({ redirectOnUnauthenticated: false }));
+  if (payload.candidateId && payload.candidateId !== sessionCandidateId) {
+    assertCandidateOwnership(payload.candidateId, sessionCandidateId);
+  }
+  return resumeIngestionService.ingestResume(sessionCandidateId, {
     fileName: payload.fileName,
     text: payload.text
   });
@@ -69,9 +94,13 @@ export async function resolveProposedItem(
   payload: ResolveProposedItemPayload,
   candidateId?: string
 ): Promise<{ resolved: boolean; remainingInBatch: number }> {
-  const effectiveCandidateId = candidateId || payload.candidateId || 'cand-1';
+  const sessionCandidateId =
+    candidateId || (await requireCandidateId({ redirectOnUnauthenticated: false }));
+  if (payload.candidateId && payload.candidateId !== sessionCandidateId) {
+    assertCandidateOwnership(payload.candidateId, sessionCandidateId);
+  }
   return knowledgeBankService.resolveProposedItem(
-    effectiveCandidateId,
+    sessionCandidateId,
     payload.batchId,
     payload.tempId,
     payload.action,
@@ -83,6 +112,10 @@ export async function acceptAllProposedItems(
   payload: AcceptAllProposedPayload,
   candidateId?: string
 ): Promise<void> {
-  const effectiveCandidateId = candidateId || payload.candidateId || 'cand-1';
-  return knowledgeBankService.acceptAllProposedItems(effectiveCandidateId, payload.batchId);
+  const sessionCandidateId =
+    candidateId || (await requireCandidateId({ redirectOnUnauthenticated: false }));
+  if (payload.candidateId && payload.candidateId !== sessionCandidateId) {
+    assertCandidateOwnership(payload.candidateId, sessionCandidateId);
+  }
+  return knowledgeBankService.acceptAllProposedItems(sessionCandidateId, payload.batchId);
 }

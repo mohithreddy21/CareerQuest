@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { Prisma } from '@prisma/client';
 import type {
   Job as PrismaJob,
   JobAnalysis as PrismaJobAnalysis,
@@ -14,7 +15,8 @@ import type {
   JobSourceReference as PrismaJobSourceReference,
   CandidateJobState as PrismaCandidateJobState,
   SavedSearch as PrismaSavedSearch,
-  Prisma
+  SavedSearchAlert as PrismaSavedSearchAlert,
+  CandidateNotification as PrismaCandidateNotification
 } from '@prisma/client';
 import {
   Application,
@@ -31,6 +33,8 @@ import {
   CandidateJobState,
   CandidateJobStatus,
   SavedSearch,
+  SavedSearchAlert,
+  CandidateNotification,
   SourceStatus,
   VerificationStatus,
   ReferenceRole,
@@ -66,6 +70,29 @@ import {
   detectSource,
   normalizeJobUrl
 } from '@/features/jobs/lib/importer';
+import {
+  evaluateDeduplication,
+  shouldPromoteNewSource,
+  selectBestPrimarySource,
+  aggregateJobStatus,
+  normalizeCompany,
+  isSourceUsable
+} from '@/features/jobs/lib/dedup';
+import {
+  DEFAULT_RANKING_CONFIG,
+  DEFAULT_DISCOVERY_PAGE_SIZE,
+  MAX_DISCOVERY_PAGE_SIZE,
+  DiscoveryRankingParams,
+  DiscoveryRankingResponse,
+  DiscoveryRankingCursorPayload,
+  RankedOpportunity,
+  buildRankingContextKey,
+  calculateOpportunityPriority,
+  compareDiscoveryOrder,
+  decodeCursor,
+  encodeCursor,
+  isRowAfterCursor
+} from '@/features/jobs/lib/ranking';
 import { analysisService } from '@/features/jobs/services/analysis-service';
 import { matchService } from '@/features/jobs/services/match-service';
 import {
@@ -89,7 +116,17 @@ import { ConcurrencyError } from '@/types/errors';
 import { extractResumeContent } from '@/types/resume-content';
 import { RESUME_TEMPLATES } from '@/features/templates/constants/templates';
 
-const DEFAULT_DEMO_CANDIDATE_ID = 'cand-1';
+/**
+ * Resolves candidate ID with strict invariant enforcement.
+ * An explicit authenticated candidate ID is required for all candidate-scoped operations.
+ * Silently falling back to demo candidates (such as cand-1) is strictly forbidden.
+ */
+function resolveCandidateId(candidateId?: string, operationName?: string): string {
+  if (candidateId && candidateId.trim()) return candidateId;
+  throw new Error(
+    `SECURITY VIOLATION: Candidate ID is required for candidate-scoped operation "${operationName || 'unspecified'}". Unauthenticated access is not permitted.`
+  );
+}
 
 function getSkillName(k: { content: Prisma.JsonValue }): string {
   const obj = k.content as unknown as { name?: string };
@@ -136,9 +173,11 @@ function mapKnowledgeItem(
  * 5. Explicit mapping from Prisma models to domain entities.
  */
 export class PrismaCareerRepository implements ICareerRepository {
+  private previousJobStates = new Map<string, CandidateJobStatus>();
+
   // --- Candidate Identity, Profile & Preferences ---
   async getCandidateProfile(candidateId?: string): Promise<CandidateProfile> {
-    const candId = candidateId || DEFAULT_DEMO_CANDIDATE_ID;
+    const candId = resolveCandidateId(candidateId);
     const candidate = await prisma.candidate.findUnique({
       where: { id: candId },
       include: {
@@ -240,7 +279,7 @@ export class PrismaCareerRepository implements ICareerRepository {
     updates: Partial<CandidateProfile>,
     candidateId?: string
   ): Promise<CandidateProfile> {
-    const candId = candidateId || DEFAULT_DEMO_CANDIDATE_ID;
+    const candId = resolveCandidateId(candidateId);
 
     await prisma.candidateProfile.update({
       where: { candidateId: candId },
@@ -274,7 +313,7 @@ export class PrismaCareerRepository implements ICareerRepository {
   }
 
   async getCandidatePreferences(candidateId?: string): Promise<CandidatePreferences | null> {
-    const candId = candidateId || DEFAULT_DEMO_CANDIDATE_ID;
+    const candId = resolveCandidateId(candidateId);
     const prefs = await prisma.candidatePreferences.findUnique({
       where: { candidateId: candId }
     });
@@ -292,7 +331,7 @@ export class PrismaCareerRepository implements ICareerRepository {
     updates: Partial<CandidatePreferences>,
     candidateId?: string
   ): Promise<CandidatePreferences> {
-    const candId = candidateId || DEFAULT_DEMO_CANDIDATE_ID;
+    const candId = resolveCandidateId(candidateId);
     const prefs = await prisma.candidatePreferences.upsert({
       where: { candidateId: candId },
       create: {
@@ -332,12 +371,12 @@ export class PrismaCareerRepository implements ICareerRepository {
     filters?: JobFilters,
     candidateId?: string
   ): Promise<(Job & { match?: JobMatch | null; applicationStatus?: ApplicationStatus | null })[]> {
-    const candId = candidateId || DEFAULT_DEMO_CANDIDATE_ID;
+    const candId = candidateId && candidateId.trim() ? candidateId : undefined;
 
     // Public jobs OR private jobs imported by this candidate
     const jobs = await prisma.job.findMany({
       where: {
-        OR: [{ isPublic: true }, { importedByCandidateId: candId }],
+        OR: [{ isPublic: true }, ...(candId ? [{ importedByCandidateId: candId }] : [])],
         ...(filters?.status && filters.status !== 'all'
           ? { jobStatus: filters.status }
           : { jobStatus: 'active' }),
@@ -348,18 +387,22 @@ export class PrismaCareerRepository implements ICareerRepository {
       },
       include: {
         analysis: true,
-        matches: {
-          where: { candidateId: candId }
-        },
-        applications: {
-          where: { candidateId: candId }
-        }
+        matches: candId
+          ? {
+              where: { candidateId: candId }
+            }
+          : false,
+        applications: candId
+          ? {
+              where: { candidateId: candId }
+            }
+          : false
       }
     });
 
     let mapped = jobs.map((j) => {
-      const matchRecord = j.matches[0];
-      const appRecord = j.applications[0];
+      const matchRecord = j.matches?.[0];
+      const appRecord = j.applications?.[0];
 
       const match: JobMatch | null = matchRecord ? this.mapJobMatch(matchRecord) : null;
       const domainJob: Job = this.mapJob(j);
@@ -411,7 +454,7 @@ export class PrismaCareerRepository implements ICareerRepository {
   }
 
   async getJobById(id: string, candidateId?: string): Promise<Job | null> {
-    const candId = candidateId || DEFAULT_DEMO_CANDIDATE_ID;
+    const candId = resolveCandidateId(candidateId);
     const j = await prisma.job.findFirst({
       where: {
         id,
@@ -431,7 +474,7 @@ export class PrismaCareerRepository implements ICareerRepository {
   }
 
   async getJobMatch(jobId: string, candidateId?: string): Promise<JobMatch | null> {
-    const candId = candidateId || DEFAULT_DEMO_CANDIDATE_ID;
+    const candId = resolveCandidateId(candidateId);
     const m = await prisma.jobMatch.findUnique({
       where: {
         candidateId_jobId: {
@@ -474,7 +517,7 @@ export class PrismaCareerRepository implements ICareerRepository {
   }
 
   async saveJobMatch(match: JobMatch, candidateId?: string): Promise<JobMatch> {
-    const candId = candidateId || match.candidateId || DEFAULT_DEMO_CANDIDATE_ID;
+    const candId = resolveCandidateId(candidateId || match.candidateId, 'saveJobMatch');
     const saved = await prisma.jobMatch.upsert({
       where: {
         candidateId_jobId: {
@@ -516,7 +559,7 @@ export class PrismaCareerRepository implements ICareerRepository {
     force?: boolean,
     candidateId?: string
   ): Promise<ImportJobResponse> {
-    const candId = candidateId || DEFAULT_DEMO_CANDIDATE_ID;
+    const candId = resolveCandidateId(candidateId);
 
     // Upfront exact duplicate check on (source, normalizedUrl) before performing network request
     const detection = detectSource(url);
@@ -542,8 +585,11 @@ export class PrismaCareerRepository implements ICareerRepository {
         return {
           success: false,
           isDuplicate: true,
+          duplicateTier: 'exact_match',
+          duplicateGroupId: existingRef.job?.duplicateGroupId || undefined,
           existingJob: domainJob || undefined,
           job: domainJob || undefined,
+          sourceReference: this.mapJobSourceReference(existingRef),
           analysis: analysis || undefined,
           match: match || undefined,
           adapterName: detection.source === 'manual' ? 'Manual Job Text' : detection.source,
@@ -569,8 +615,8 @@ export class PrismaCareerRepository implements ICareerRepository {
 
     const norm = ingestResult.data;
 
-    // 2. Check for exact source duplicate: (source, normalizedUrl)
-    const existingRef = await prisma.jobSourceReference.findUnique({
+    // 2. Exact source duplicate check: (source, normalizedUrl) or (source, sourceJobId)
+    let existingRef = await prisma.jobSourceReference.findUnique({
       where: {
         source_normalizedUrl: {
           source: norm.source,
@@ -580,6 +626,16 @@ export class PrismaCareerRepository implements ICareerRepository {
       include: { job: true }
     });
 
+    if (!existingRef && norm.sourceJobId) {
+      existingRef = await prisma.jobSourceReference.findFirst({
+        where: {
+          source: norm.source,
+          sourceJobId: norm.sourceJobId
+        },
+        include: { job: true }
+      });
+    }
+
     if (existingRef && !force) {
       const domainJob = await this.getJobById(existingRef.jobId, candId);
       const analysis = await this.getJobAnalysis(existingRef.jobId);
@@ -588,8 +644,11 @@ export class PrismaCareerRepository implements ICareerRepository {
       return {
         success: false,
         isDuplicate: true,
+        duplicateTier: 'exact_match',
+        duplicateGroupId: existingRef.job?.duplicateGroupId || undefined,
         existingJob: domainJob || undefined,
         job: domainJob || undefined,
+        sourceReference: this.mapJobSourceReference(existingRef),
         analysis: analysis || undefined,
         match: match || undefined,
         adapterName: ingestResult.adapterName,
@@ -597,7 +656,81 @@ export class PrismaCareerRepository implements ICareerRepository {
       };
     }
 
-    // 3. Atomically persist Job and JobSourceReference
+    // 3. Cross-Source Deduplication Check (Phase 7C Tier 2 / 3 / 4)
+    const candidateJobs = await this.findDuplicateCandidates(norm.company, norm.title, candId);
+    const dedupEval = evaluateDeduplication(norm, candidateJobs);
+
+    // --- CASE A: Strong Duplicate (Tier 2) ---
+    // Reuses the existing canonical Job and attaches the new source reference!
+    if (dedupEval.tier === 'strong_duplicate' && dedupEval.canonicalJob && !force) {
+      const canonicalJob = dedupEval.canonicalJob;
+      const groupId = canonicalJob.duplicateGroupId || `dup-group-${canonicalJob.id}`;
+
+      if (!canonicalJob.duplicateGroupId) {
+        await this.updateJobDuplicateGroup(canonicalJob.id, groupId);
+        canonicalJob.duplicateGroupId = groupId;
+      }
+
+      // Check current primary source reference
+      const existingRefs = await this.getJobSourceReferences(canonicalJob.id);
+      const currentPrimary = existingRefs.find((r) => r.isPrimary);
+      const incomingStatus = norm.sourceStatus || 'active';
+      const shouldPromote =
+        incomingStatus !== 'closed' && shouldPromoteNewSource(norm.source, currentPrimary);
+
+      // Create new JobSourceReference attached to canonicalJob
+      const newRef = await this.addJobSourceReference({
+        jobId: canonicalJob.id,
+        source: norm.source,
+        sourceJobId: norm.sourceJobId || null,
+        sourceUrl: norm.sourceUrl,
+        normalizedUrl: norm.normalizedUrl,
+        sourceStatus: incomingStatus,
+        verificationStatus: 'verified_accessible',
+        lastVerifiedAt: new Date(),
+        lastVerificationError: norm.closeReason || null,
+        isPrimary: shouldPromote,
+        referenceRole: shouldPromote ? 'primary' : 'alternative',
+        firstSeenAt: new Date(),
+        lastSeenAt: new Date()
+      });
+
+      // Fetch or compute analysis and match for canonical job
+      let analysis = await this.getJobAnalysis(canonicalJob.id);
+      if (!analysis) {
+        analysis = await analysisService.analyzeJob(canonicalJob);
+        await this.saveJobAnalysis(analysis);
+      }
+
+      let match = await this.getJobMatch(canonicalJob.id, candId);
+      if (!match) {
+        const candidateProfile = await this.getCandidateProfile(candId);
+        if (candidateProfile) {
+          match = await matchService.calculateMatch(canonicalJob, analysis, candidateProfile);
+          await this.saveJobMatch(match, candId);
+        }
+      }
+
+      const updatedCanonicalJob = await this.getJobById(canonicalJob.id, candId);
+
+      return {
+        success: true,
+        isDuplicate: true,
+        duplicateTier: 'strong_duplicate',
+        duplicateGroupId: groupId,
+        existingJob: canonicalJob,
+        job: updatedCanonicalJob || canonicalJob,
+        sourceReference: newRef,
+        analysis: analysis || undefined,
+        match: match || undefined,
+        adapterName: ingestResult.adapterName,
+        evidence: dedupEval.evidence,
+        possibleDuplicates: dedupEval.possibleDuplicates
+      };
+    }
+
+    // --- CASE B: Unique (Tier 4) or Possible Duplicate (Tier 3) ---
+    // A distinct canonical Job is created.
     const createdJob = await prisma.$transaction(async (tx) => {
       const j = await tx.job.create({
         data: {
@@ -618,50 +751,37 @@ export class PrismaCareerRepository implements ICareerRepository {
           postedDate: norm.postedDate ? new Date(norm.postedDate) : null,
           source: norm.source,
           originalUrl: norm.sourceUrl,
-          jobStatus: 'active',
+          jobStatus: norm.sourceStatus === 'closed' ? 'closed' : 'active',
           isPublic: false,
           importedByCandidateId: candId
         }
       });
 
-      if (existingRef) {
-        await tx.jobSourceReference.update({
-          where: { id: existingRef.id },
-          data: {
-            jobId: j.id,
-            sourceJobId: norm.sourceJobId,
-            sourceUrl: norm.sourceUrl,
-            sourceStatus: 'active',
-            verificationStatus: 'verified_accessible',
-            lastVerifiedAt: new Date(),
-            isPrimary: true,
-            referenceRole: 'primary',
-            lastSeenAt: new Date()
-          }
-        });
-      } else {
-        await tx.jobSourceReference.create({
-          data: {
-            jobId: j.id,
-            source: norm.source,
-            sourceJobId: norm.sourceJobId,
-            sourceUrl: norm.sourceUrl,
-            normalizedUrl: norm.normalizedUrl,
-            sourceStatus: 'active',
-            verificationStatus: 'verified_accessible',
-            lastVerifiedAt: new Date(),
-            isPrimary: true,
-            referenceRole: 'primary'
-          }
-        });
-      }
+      const ref = await tx.jobSourceReference.create({
+        data: {
+          jobId: j.id,
+          source: norm.source,
+          sourceJobId: norm.sourceJobId || null,
+          sourceUrl: norm.sourceUrl,
+          normalizedUrl: norm.normalizedUrl,
+          sourceStatus: norm.sourceStatus || 'active',
+          verificationStatus: 'verified_accessible',
+          lastVerifiedAt: new Date(),
+          lastVerificationError: norm.closeReason || null,
+          isPrimary: true,
+          referenceRole: 'primary',
+          firstSeenAt: new Date(),
+          lastSeenAt: new Date()
+        }
+      });
 
-      return j;
+      return { job: j, ref };
     });
 
-    const domainJob = this.mapJob(createdJob);
+    const domainJob = this.mapJob(createdJob.job);
+    const domainRef = this.mapJobSourceReference(createdJob.ref);
 
-    // 4. Trigger Analysis
+    // Trigger Analysis
     let analysis: JobAnalysis;
     try {
       analysis = await analysisService.analyzeJob(domainJob);
@@ -686,7 +806,7 @@ export class PrismaCareerRepository implements ICareerRepository {
       await this.saveJobAnalysis(analysis);
     }
 
-    // 5. Trigger Match if Candidate exists
+    // Trigger Match
     let match: JobMatch | undefined;
     try {
       const candidateProfile = await this.getCandidateProfile(candId);
@@ -700,10 +820,14 @@ export class PrismaCareerRepository implements ICareerRepository {
 
     return {
       success: true,
+      isDuplicate: false,
+      duplicateTier: dedupEval.tier,
       job: domainJob,
+      sourceReference: domainRef,
       analysis,
       match,
-      adapterName: ingestResult.adapterName
+      adapterName: ingestResult.adapterName,
+      possibleDuplicates: dedupEval.possibleDuplicates
     };
   }
 
@@ -713,7 +837,7 @@ export class PrismaCareerRepository implements ICareerRepository {
     company?: string,
     candidateId?: string
   ): Promise<ImportJobResponse> {
-    const candId = candidateId || DEFAULT_DEMO_CANDIDATE_ID;
+    const candId = resolveCandidateId(candidateId);
 
     const ingestResult = await ingestJobFromManualText({
       text,
@@ -731,6 +855,75 @@ export class PrismaCareerRepository implements ICareerRepository {
 
     const norm = ingestResult.data;
 
+    // Cross-Source Deduplication Check (Phase 7C Tier 2 / 3 / 4)
+    const candidateJobs = await this.findDuplicateCandidates(norm.company, norm.title, candId);
+    const dedupEval = evaluateDeduplication(norm, candidateJobs);
+
+    // --- CASE A: Strong Duplicate (Tier 2) ---
+    if (dedupEval.tier === 'strong_duplicate' && dedupEval.canonicalJob) {
+      const canonicalJob = dedupEval.canonicalJob;
+      const groupId = canonicalJob.duplicateGroupId || `dup-group-${canonicalJob.id}`;
+
+      if (!canonicalJob.duplicateGroupId) {
+        await this.updateJobDuplicateGroup(canonicalJob.id, groupId);
+        canonicalJob.duplicateGroupId = groupId;
+      }
+
+      // Check current primary source reference
+      const existingRefs = await this.getJobSourceReferences(canonicalJob.id);
+      const currentPrimary = existingRefs.find((r) => r.isPrimary);
+      const shouldPromote = shouldPromoteNewSource('manual', currentPrimary);
+
+      const newRef = await this.addJobSourceReference({
+        jobId: canonicalJob.id,
+        source: 'manual',
+        sourceJobId: null,
+        sourceUrl: norm.sourceUrl,
+        normalizedUrl: norm.normalizedUrl,
+        sourceStatus: 'active',
+        verificationStatus: 'verified_accessible',
+        lastVerifiedAt: new Date(),
+        lastVerificationError: null,
+        isPrimary: shouldPromote,
+        referenceRole: shouldPromote ? 'primary' : 'alternative',
+        firstSeenAt: new Date(),
+        lastSeenAt: new Date()
+      });
+
+      let analysis = await this.getJobAnalysis(canonicalJob.id);
+      if (!analysis) {
+        analysis = await analysisService.analyzeJob(canonicalJob);
+        await this.saveJobAnalysis(analysis);
+      }
+
+      let match = await this.getJobMatch(canonicalJob.id, candId);
+      if (!match) {
+        const candidateProfile = await this.getCandidateProfile(candId);
+        if (candidateProfile) {
+          match = await matchService.calculateMatch(canonicalJob, analysis, candidateProfile);
+          await this.saveJobMatch(match, candId);
+        }
+      }
+
+      const updatedCanonicalJob = await this.getJobById(canonicalJob.id, candId);
+
+      return {
+        success: true,
+        isDuplicate: true,
+        duplicateTier: 'strong_duplicate',
+        duplicateGroupId: groupId,
+        existingJob: canonicalJob,
+        job: updatedCanonicalJob || canonicalJob,
+        sourceReference: newRef,
+        analysis: analysis || undefined,
+        match: match || undefined,
+        adapterName: ingestResult.adapterName,
+        evidence: dedupEval.evidence,
+        possibleDuplicates: dedupEval.possibleDuplicates
+      };
+    }
+
+    // --- CASE B: Unique (Tier 4) or Possible Duplicate (Tier 3) ---
     const createdJob = await prisma.$transaction(async (tx) => {
       const j = await tx.job.create({
         data: {
@@ -757,7 +950,7 @@ export class PrismaCareerRepository implements ICareerRepository {
         }
       });
 
-      await tx.jobSourceReference.create({
+      const ref = await tx.jobSourceReference.create({
         data: {
           jobId: j.id,
           source: 'manual',
@@ -768,14 +961,17 @@ export class PrismaCareerRepository implements ICareerRepository {
           verificationStatus: 'verified_accessible',
           lastVerifiedAt: new Date(),
           isPrimary: true,
-          referenceRole: 'primary'
+          referenceRole: 'primary',
+          firstSeenAt: new Date(),
+          lastSeenAt: new Date()
         }
       });
 
-      return j;
+      return { job: j, ref };
     });
 
-    const domainJob = this.mapJob(createdJob);
+    const domainJob = this.mapJob(createdJob.job);
+    const domainRef = this.mapJobSourceReference(createdJob.ref);
 
     let analysis: JobAnalysis;
     try {
@@ -814,10 +1010,14 @@ export class PrismaCareerRepository implements ICareerRepository {
 
     return {
       success: true,
+      isDuplicate: false,
+      duplicateTier: dedupEval.tier,
       job: domainJob,
+      sourceReference: domainRef,
       analysis,
       match,
-      adapterName: ingestResult.adapterName
+      adapterName: ingestResult.adapterName,
+      possibleDuplicates: dedupEval.possibleDuplicates
     };
   }
 
@@ -974,10 +1174,17 @@ export class PrismaCareerRepository implements ICareerRepository {
       throw new Error('candidateId is mandatory for setCandidateJobState');
     }
 
+    const key = `${candidateId}:${jobId}`;
+
     const updated = await prisma.$transaction(async (tx) => {
       const existing = await tx.candidateJobState.findUnique({
         where: { candidateId_jobId: { candidateId, jobId } }
       });
+
+      const prevStatus: CandidateJobStatus = existing
+        ? (existing.status as CandidateJobStatus)
+        : 'UNSEEN';
+      this.previousJobStates.set(key, prevStatus);
 
       const now = new Date();
 
@@ -1037,6 +1244,65 @@ export class PrismaCareerRepository implements ICareerRepository {
     return this.mapCandidateJobState(updated);
   }
 
+  async undoCandidateJobState(
+    jobId: string,
+    candidateId: string,
+    targetPreviousState?: CandidateJobStatus
+  ): Promise<CandidateJobState | null> {
+    if (!candidateId) {
+      throw new Error('candidateId is mandatory for undoCandidateJobState');
+    }
+
+    const key = `${candidateId}:${jobId}`;
+    const existing = await prisma.candidateJobState.findUnique({
+      where: { candidateId_jobId: { candidateId, jobId } }
+    });
+
+    if (!existing || existing.status !== 'DISMISSED') {
+      return existing ? this.mapCandidateJobState(existing) : null;
+    }
+
+    const target = targetPreviousState || this.previousJobStates.get(key) || 'UNSEEN';
+
+    if (target === 'UNSEEN') {
+      await prisma.candidateJobState.delete({
+        where: { id: existing.id }
+      });
+      this.previousJobStates.delete(key);
+      return null;
+    }
+
+    if (target === 'SAVED') {
+      const now = new Date();
+      const updated = await prisma.candidateJobState.update({
+        where: { id: existing.id },
+        data: {
+          status: 'SAVED',
+          savedAt: now,
+          dismissedAt: null,
+          dismissedReason: null
+        }
+      });
+      this.previousJobStates.set(key, 'SAVED');
+      return this.mapCandidateJobState(updated);
+    }
+
+    if (target === 'VIEWED') {
+      const updated = await prisma.candidateJobState.update({
+        where: { id: existing.id },
+        data: {
+          status: 'VIEWED',
+          dismissedAt: null,
+          dismissedReason: null
+        }
+      });
+      this.previousJobStates.set(key, 'VIEWED');
+      return this.mapCandidateJobState(updated);
+    }
+
+    return this.mapCandidateJobState(existing);
+  }
+
   async getSavedSearches(candidateId: string): Promise<SavedSearch[]> {
     if (!candidateId) {
       throw new Error('candidateId is mandatory for getSavedSearches');
@@ -1059,9 +1325,10 @@ export class PrismaCareerRepository implements ICareerRepository {
   }
 
   async saveSavedSearch(
-    search: Omit<SavedSearch, 'id' | 'createdAt' | 'updatedAt' | 'candidateId'> & {
+    search: Partial<Omit<SavedSearch, 'id' | 'createdAt' | 'updatedAt' | 'candidateId'>> & {
       id?: string;
       candidateId?: string;
+      name?: string;
     },
     candidateId: string
   ): Promise<SavedSearch> {
@@ -1078,6 +1345,36 @@ export class PrismaCareerRepository implements ICareerRepository {
         throw new Error(`Saved search ${search.id} not found or access denied`);
       }
 
+      // Optimistic concurrency check
+      if (search.filterVersion && search.filterVersion !== existing.filterVersion) {
+        throw new Error(
+          `Concurrency conflict: Saved search version ${search.filterVersion} does not match current version ${existing.filterVersion}`
+        );
+      }
+
+      const definitionChanged =
+        (search.name !== undefined && search.name !== existing.name) ||
+        (search.query !== undefined && search.query !== existing.query) ||
+        (search.locations !== undefined &&
+          JSON.stringify(search.locations) !== JSON.stringify(existing.locations)) ||
+        (search.workArrangements !== undefined &&
+          JSON.stringify(search.workArrangements) !== JSON.stringify(existing.workArrangements)) ||
+        (search.roleCategories !== undefined &&
+          JSON.stringify(search.roleCategories) !== JSON.stringify(existing.roleCategories)) ||
+        (search.seniorityLevels !== undefined &&
+          JSON.stringify(search.seniorityLevels) !== JSON.stringify(existing.seniorityLevels)) ||
+        (search.minSalary !== undefined && search.minSalary !== existing.minSalary) ||
+        (search.currency !== undefined && search.currency !== existing.currency) ||
+        (search.alertFrequency !== undefined &&
+          search.alertFrequency !== existing.alertFrequency) ||
+        (search.minMatchScore !== undefined && search.minMatchScore !== existing.minMatchScore);
+
+      let nextVersion = existing.filterVersion;
+      if (definitionChanged) {
+        const currentVerNum = parseFloat(existing.filterVersion) || 1.0;
+        nextVersion = (Math.round((currentVerNum + 0.1) * 10) / 10).toFixed(1);
+      }
+
       const updated = await prisma.savedSearch.update({
         where: { id: search.id },
         data: {
@@ -1090,9 +1387,15 @@ export class PrismaCareerRepository implements ICareerRepository {
           minSalary: search.minSalary || null,
           currency: search.currency || null,
           alertFrequency: search.alertFrequency || 'weekly',
-          filterVersion: search.filterVersion || '1.0',
-          lastExecutedAt: search.lastExecutedAt ? new Date(search.lastExecutedAt) : null,
-          lastMatchCount: search.lastMatchCount || 0
+          filterVersion: nextVersion,
+          isEnabled: search.isEnabled !== undefined ? search.isEnabled : existing.isEnabled,
+          minMatchScore:
+            search.minMatchScore !== undefined ? search.minMatchScore : existing.minMatchScore,
+          lastExecutedAt: search.lastExecutedAt
+            ? new Date(search.lastExecutedAt)
+            : existing.lastExecutedAt,
+          lastMatchCount:
+            search.lastMatchCount !== undefined ? search.lastMatchCount : existing.lastMatchCount
         }
       });
       return this.mapSavedSearch(updated);
@@ -1101,7 +1404,7 @@ export class PrismaCareerRepository implements ICareerRepository {
     const created = await prisma.savedSearch.create({
       data: {
         candidateId,
-        name: search.name,
+        name: search.name || 'Untitled Saved Search',
         query: search.query || null,
         locations: search.locations || [],
         workArrangements: search.workArrangements || [],
@@ -1111,11 +1414,47 @@ export class PrismaCareerRepository implements ICareerRepository {
         currency: search.currency || null,
         alertFrequency: search.alertFrequency || 'weekly',
         filterVersion: search.filterVersion || '1.0',
+        isEnabled: search.isEnabled !== undefined ? search.isEnabled : true,
+        minMatchScore: search.minMatchScore || null,
         lastExecutedAt: search.lastExecutedAt ? new Date(search.lastExecutedAt) : null,
         lastMatchCount: search.lastMatchCount || 0
       }
     });
     return this.mapSavedSearch(created);
+  }
+
+  async enableSavedSearch(id: string, candidateId: string): Promise<SavedSearch> {
+    if (!candidateId) {
+      throw new Error('candidateId is mandatory for enableSavedSearch');
+    }
+    const existing = await prisma.savedSearch.findFirst({
+      where: { id, candidateId }
+    });
+    if (!existing) {
+      throw new Error(`Saved search ${id} not found or access denied`);
+    }
+    const updated = await prisma.savedSearch.update({
+      where: { id },
+      data: { isEnabled: true }
+    });
+    return this.mapSavedSearch(updated);
+  }
+
+  async disableSavedSearch(id: string, candidateId: string): Promise<SavedSearch> {
+    if (!candidateId) {
+      throw new Error('candidateId is mandatory for disableSavedSearch');
+    }
+    const existing = await prisma.savedSearch.findFirst({
+      where: { id, candidateId }
+    });
+    if (!existing) {
+      throw new Error(`Saved search ${id} not found or access denied`);
+    }
+    const updated = await prisma.savedSearch.update({
+      where: { id },
+      data: { isEnabled: false }
+    });
+    return this.mapSavedSearch(updated);
   }
 
   async deleteSavedSearch(id: string, candidateId: string): Promise<boolean> {
@@ -1128,9 +1467,631 @@ export class PrismaCareerRepository implements ICareerRepository {
     return result.count > 0;
   }
 
+  async getEnabledSavedSearches(frequency?: string, candidateId?: string): Promise<SavedSearch[]> {
+    const searches = await prisma.savedSearch.findMany({
+      where: {
+        isEnabled: true,
+        ...(frequency ? { alertFrequency: frequency } : {}),
+        ...(candidateId ? { candidateId } : {})
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+    return searches.map((s) => this.mapSavedSearch(s));
+  }
+
+  // --- Phase 7E: Alerts & In-App Notifications ---
+
+  async getSavedSearchAlerts(
+    candidateId: string,
+    savedSearchId?: string
+  ): Promise<SavedSearchAlert[]> {
+    if (!candidateId) {
+      throw new Error('candidateId is mandatory for getSavedSearchAlerts');
+    }
+    const where: Prisma.SavedSearchAlertWhereInput = {
+      candidateId,
+      ...(savedSearchId ? { savedSearchId } : {})
+    };
+    const alerts = await prisma.savedSearchAlert.findMany({
+      where,
+      orderBy: { generatedAt: 'desc' }
+    });
+    return alerts.map((a) => this.mapSavedSearchAlert(a));
+  }
+
+  async createSavedSearchAlertAndNotification(params: {
+    candidateId: string;
+    savedSearchId: string;
+    jobId: string;
+    savedSearchVersion: string;
+    notificationTitle: string;
+    notificationMessage: string;
+    generatedAt?: Date;
+  }): Promise<{
+    alert: SavedSearchAlert | null;
+    notification: CandidateNotification | null;
+    isNew: boolean;
+  }> {
+    const {
+      candidateId,
+      savedSearchId,
+      jobId,
+      savedSearchVersion,
+      notificationTitle,
+      notificationMessage,
+      generatedAt = new Date()
+    } = params;
+
+    if (!candidateId) throw new Error('candidateId is mandatory');
+    if (!savedSearchId) throw new Error('savedSearchId is mandatory');
+    if (!jobId) throw new Error('jobId is mandatory');
+
+    try {
+      return await prisma.$transaction(async (tx) => {
+        // 1. Check if alert already exists
+        const existing = await tx.savedSearchAlert.findUnique({
+          where: {
+            candidateId_savedSearchId_jobId: {
+              candidateId,
+              savedSearchId,
+              jobId
+            }
+          }
+        });
+
+        if (existing) {
+          return {
+            alert: this.mapSavedSearchAlert(existing),
+            notification: null,
+            isNew: false
+          };
+        }
+
+        // 2. Create alert atomically
+        const createdAlert = await tx.savedSearchAlert.create({
+          data: {
+            candidateId,
+            savedSearchId,
+            jobId,
+            savedSearchVersion,
+            generatedAt,
+            status: 'generated'
+          }
+        });
+
+        // 3. Create candidate notification linked to the job and saved search
+        const createdNotification = await tx.candidateNotification.create({
+          data: {
+            candidateId,
+            type: 'SAVED_SEARCH_ALERT',
+            title: notificationTitle,
+            message: notificationMessage,
+            relatedJobId: jobId,
+            relatedSavedSearchId: savedSearchId,
+            createdAt: generatedAt
+          }
+        });
+
+        return {
+          alert: this.mapSavedSearchAlert(createdAlert),
+          notification: this.mapCandidateNotification(createdNotification),
+          isNew: true
+        };
+      });
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        const raceExisting = await prisma.savedSearchAlert.findUnique({
+          where: {
+            candidateId_savedSearchId_jobId: { candidateId, savedSearchId, jobId }
+          }
+        });
+        return {
+          alert: raceExisting ? this.mapSavedSearchAlert(raceExisting) : null,
+          notification: null,
+          isNew: false
+        };
+      }
+      throw err;
+    }
+  }
+
+  async getNotifications(candidateId: string): Promise<CandidateNotification[]> {
+    if (!candidateId) {
+      throw new Error('candidateId is mandatory for getNotifications');
+    }
+    const items = await prisma.candidateNotification.findMany({
+      where: { candidateId },
+      orderBy: { createdAt: 'desc' }
+    });
+    return items.map((n) => this.mapCandidateNotification(n));
+  }
+
+  async markNotificationAsRead(id: string, candidateId: string): Promise<boolean> {
+    if (!candidateId) {
+      throw new Error('candidateId is mandatory for markNotificationAsRead');
+    }
+    const result = await prisma.candidateNotification.updateMany({
+      where: { id, candidateId },
+      data: { readAt: new Date() }
+    });
+    return result.count > 0;
+  }
+
+  // --- Phase 7C: Deduplication & Source Intelligence ---
+
+  async findDuplicateCandidates(
+    company: string,
+    title?: string,
+    candidateId?: string
+  ): Promise<Job[]> {
+    const normCompany = normalizeCompany(company);
+    // Respect candidate isolation: public jobs OR private jobs imported by this candidate
+    const isolationWhere: Prisma.JobWhereInput = candidateId
+      ? {
+          OR: [{ isPublic: true }, { importedByCandidateId: candidateId }]
+        }
+      : { isPublic: true };
+
+    const rawJobs = await prisma.job.findMany({
+      where: {
+        AND: [
+          isolationWhere,
+          {
+            OR: [
+              { company: { contains: normCompany, mode: 'insensitive' } },
+              { company: { equals: company, mode: 'insensitive' } }
+            ]
+          }
+        ]
+      },
+      include: {
+        sourceReferences: {
+          orderBy: [{ isPrimary: 'desc' }, { firstSeenAt: 'asc' }]
+        }
+      }
+    });
+
+    return rawJobs.map((j) => this.mapJob(j));
+  }
+
+  async updateJobDuplicateGroup(jobId: string, duplicateGroupId: string): Promise<void> {
+    await prisma.job.update({
+      where: { id: jobId },
+      data: { duplicateGroupId }
+    });
+  }
+
+  async updateJobStatus(jobId: string, jobStatus: string): Promise<void> {
+    await prisma.job.update({
+      where: { id: jobId },
+      data: { jobStatus }
+    });
+  }
+
+  async updateJobSourceReference(
+    id: string,
+    updates: Partial<
+      Pick<
+        JobSourceReference,
+        | 'sourceStatus'
+        | 'verificationStatus'
+        | 'lastVerifiedAt'
+        | 'lastVerificationError'
+        | 'isPrimary'
+        | 'referenceRole'
+        | 'lastSeenAt'
+      >
+    >
+  ): Promise<JobSourceReference> {
+    const updated = await prisma.$transaction(async (tx) => {
+      const existing = await tx.jobSourceReference.findUnique({
+        where: { id }
+      });
+      if (!existing) {
+        throw new Error(`Job source reference ${id} not found`);
+      }
+
+      if (updates.isPrimary) {
+        // Demote any other primary references for this job
+        await tx.jobSourceReference.updateMany({
+          where: { jobId: existing.jobId, isPrimary: true, id: { not: id } },
+          data: { isPrimary: false, referenceRole: 'alternative' }
+        });
+      }
+
+      const ref = await tx.jobSourceReference.update({
+        where: { id },
+        data: {
+          sourceStatus: updates.sourceStatus ?? existing.sourceStatus,
+          verificationStatus: updates.verificationStatus ?? existing.verificationStatus,
+          lastVerifiedAt:
+            updates.lastVerifiedAt !== undefined
+              ? updates.lastVerifiedAt
+                ? new Date(updates.lastVerifiedAt)
+                : null
+              : existing.lastVerifiedAt,
+          lastVerificationError:
+            updates.lastVerificationError !== undefined
+              ? updates.lastVerificationError
+              : existing.lastVerificationError,
+          isPrimary: updates.isPrimary !== undefined ? updates.isPrimary : existing.isPrimary,
+          referenceRole:
+            updates.referenceRole ?? (updates.isPrimary ? 'primary' : existing.referenceRole),
+          lastSeenAt: updates.lastSeenAt ? new Date(updates.lastSeenAt) : existing.lastSeenAt
+        }
+      });
+
+      // Update aggregate job status if sourceStatus changed
+      if (updates.sourceStatus && updates.sourceStatus !== existing.sourceStatus) {
+        const allRefs = await tx.jobSourceReference.findMany({
+          where: { jobId: existing.jobId }
+        });
+        const currentJob = await tx.job.findUnique({
+          where: { id: existing.jobId }
+        });
+        if (currentJob) {
+          const domainRefs = allRefs.map((r) => this.mapJobSourceReference(r));
+          const newJobStatus = aggregateJobStatus(domainRefs, currentJob.jobStatus);
+          if (newJobStatus !== currentJob.jobStatus) {
+            await tx.job.update({
+              where: { id: existing.jobId },
+              data: { jobStatus: newJobStatus }
+            });
+          }
+        }
+      }
+
+      return ref;
+    });
+
+    return this.mapJobSourceReference(updated);
+  }
+
+  async fallbackPrimarySource(jobId: string): Promise<JobSourceReference | null> {
+    return prisma.$transaction(async (tx) => {
+      const allRefs = await tx.jobSourceReference.findMany({
+        where: { jobId }
+      });
+      if (allRefs.length === 0) return null;
+
+      const domainRefs = allRefs.map((r) => this.mapJobSourceReference(r));
+      const best = selectBestPrimarySource(domainRefs);
+
+      if (!best) {
+        const currentJob = await tx.job.findUnique({ where: { id: jobId } });
+        if (currentJob) {
+          const newStatus = aggregateJobStatus(domainRefs, currentJob.jobStatus);
+          if (newStatus !== currentJob.jobStatus) {
+            await tx.job.update({
+              where: { id: jobId },
+              data: { jobStatus: newStatus }
+            });
+          }
+        }
+        return null;
+      }
+
+      if (best.isPrimary) {
+        return best;
+      }
+
+      // Demote current primaries
+      await tx.jobSourceReference.updateMany({
+        where: { jobId, isPrimary: true },
+        data: { isPrimary: false, referenceRole: 'alternative' }
+      });
+
+      // Promote best
+      const promoted = await tx.jobSourceReference.update({
+        where: { id: best.id },
+        data: { isPrimary: true, referenceRole: 'primary' }
+      });
+
+      // Update aggregate job status
+      const currentJob = await tx.job.findUnique({ where: { id: jobId } });
+      if (currentJob) {
+        const newStatus = aggregateJobStatus(domainRefs, currentJob.jobStatus);
+        if (newStatus !== currentJob.jobStatus) {
+          await tx.job.update({
+            where: { id: jobId },
+            data: { jobStatus: newStatus }
+          });
+        }
+      }
+
+      return this.mapJobSourceReference(promoted);
+    });
+  }
+
+  // --- Phase 7D: Opportunity Priority & Discovery Ranking ---
+
+  async getDiscoveryRanking(
+    params: DiscoveryRankingParams,
+    candidateId: string
+  ): Promise<DiscoveryRankingResponse> {
+    if (!candidateId) {
+      throw new Error('candidateId is mandatory for getDiscoveryRanking');
+    }
+
+    const pageSize = Math.min(
+      Math.max(1, params.pageSize || DEFAULT_DISCOVERY_PAGE_SIZE),
+      MAX_DISCOVERY_PAGE_SIZE
+    );
+
+    // 1. Fetch Candidate Preferences for context and fit calculation
+    const preferences = await this.getCandidatePreferences(candidateId);
+
+    const filterParts: string[] = [];
+    if (params.tab) filterParts.push(`t:${params.tab}`);
+    if (params.search && params.search.trim()) filterParts.push(`q:${params.search.trim()}`);
+    if (params.workArrangement && params.workArrangement !== 'all')
+      filterParts.push(`w:${params.workArrangement}`);
+    if (params.source && params.source !== 'all') filterParts.push(`s:${params.source}`);
+    if (params.minMatch !== undefined && params.minMatch !== null)
+      filterParts.push(`m:${params.minMatch}`);
+    if (params.stateFilter && params.stateFilter !== 'all')
+      filterParts.push(`st:${params.stateFilter}`);
+    if (params.includeDismissed) filterParts.push('id:1');
+    if (params.sort && params.sort !== 'priority') filterParts.push(`sort:${params.sort}`);
+
+    const filterContext = filterParts.length > 0 ? filterParts.join(';') : undefined;
+
+    const rankingContextKey = buildRankingContextKey(
+      candidateId,
+      preferences,
+      DEFAULT_RANKING_CONFIG.version,
+      filterContext
+    );
+
+    // 2. Decode & validate cursor if provided
+    let cursorPayload: DiscoveryRankingCursorPayload | null = null;
+    let cursorReset = false;
+
+    if (params.cursor) {
+      const decoded = decodeCursor(params.cursor, rankingContextKey);
+      if (decoded.isContextMismatch) {
+        // Context changed (e.g. preferences changed or different candidate or filters changed), signal reset
+        cursorReset = true;
+        cursorPayload = null;
+      } else if (decoded.error) {
+        throw new Error(`Invalid pagination cursor: ${decoded.error}`);
+      } else {
+        cursorPayload = decoded.payload;
+      }
+    }
+
+    // 3. Database query for candidate-scoped, active opportunities
+    // Candidate isolation: isPublic: true OR importedByCandidateId: candidateId
+    // Never include other candidates' private jobs!
+    const whereClause: Prisma.JobWhereInput = {
+      AND: [
+        { jobStatus: 'active' },
+        {
+          OR: [{ isPublic: true }, { importedByCandidateId: candidateId }]
+        },
+        ...(params.workArrangement && params.workArrangement !== 'all'
+          ? [{ workArrangement: params.workArrangement }]
+          : [])
+      ]
+    };
+
+    const rawJobs = await prisma.job.findMany({
+      where: whereClause,
+      include: {
+        sourceReferences: {
+          orderBy: [{ isPrimary: 'desc' }, { firstSeenAt: 'asc' }]
+        },
+        matches: {
+          where: { candidateId }
+        },
+        candidateStates: {
+          where: { candidateId }
+        },
+        applications: {
+          where: { candidateId }
+        }
+      }
+    });
+
+    // 4. Evaluation Time Snapshot & Usability Gate
+    // If a cursor is present, reuse its evaluatedAt timestamp so that freshness scores remain
+    // strictly stable across pagination pages. Otherwise establish one server-side evaluation time.
+    const evaluationDate = cursorPayload ? new Date(cursorPayload.e) : new Date();
+    const evaluatedAtIso = evaluationDate.toISOString();
+
+    const eligibleOpportunities: RankedOpportunity[] = [];
+
+    for (const rawJob of rawJobs) {
+      const domainJob = this.mapJob(rawJob);
+      const domainSources = rawJob.sourceReferences.map((r) => this.mapJobSourceReference(r));
+      const match = rawJob.matches[0] ? this.mapJobMatch(rawJob.matches[0]) : null;
+      const primarySource = domainSources.find((s) => s.isPrimary) || domainSources[0] || null;
+      const candidateState = rawJob.candidateStates[0]
+        ? this.mapCandidateJobState(rawJob.candidateStates[0])
+        : null;
+      const app = rawJob.applications[0];
+      const applicationStatus = app ? (app.status as ApplicationStatus) : null;
+
+      // Filter out applied jobs if not explicitly included
+      if (!params.includeApplied && applicationStatus) {
+        // preserve applications, can be filtered if needed
+      }
+
+      // Check source usability against stable evaluation timestamp
+      const hasUsableSource = domainSources.some((s) => isSourceUsable(s, evaluationDate));
+
+      // Tab semantics
+      const tab = params.tab || 'recommended';
+      if (tab === 'saved') {
+        if (candidateState?.status !== 'SAVED') {
+          continue;
+        }
+      } else if (tab === 'recommended') {
+        // Exclude DISMISSED by default
+        if (!params.includeDismissed && candidateState?.status === 'DISMISSED') {
+          continue;
+        }
+        // Exclude without usable sources
+        if (!hasUsableSource) {
+          continue;
+        }
+      }
+
+      // Explicit state filter
+      if (params.stateFilter && params.stateFilter !== 'all') {
+        if (params.stateFilter === 'saved' && candidateState?.status !== 'SAVED') continue;
+        if (params.stateFilter === 'dismissed' && candidateState?.status !== 'DISMISSED') continue;
+        if (params.stateFilter === 'viewed' && candidateState?.status !== 'VIEWED') continue;
+        if (params.stateFilter === 'unseen' && candidateState && candidateState.status !== 'UNSEEN')
+          continue;
+      }
+
+      // Minimum Match Score filter (JobMatch.score, NOT Preference Fit!)
+      if (params.minMatch !== undefined && params.minMatch !== null && params.minMatch > 0) {
+        const matchScore = match?.score ?? 0;
+        if (matchScore < params.minMatch) {
+          continue;
+        }
+      }
+
+      // Source filter
+      if (params.source && params.source.trim() && params.source !== 'all') {
+        const sourceQuery = params.source.toLowerCase().trim();
+        const hasMatchingSource = domainSources.some(
+          (s) =>
+            s.source.toLowerCase() === sourceQuery ||
+            (s.sourceUrl && s.sourceUrl.toLowerCase().includes(sourceQuery))
+        );
+        if (!hasMatchingSource) {
+          continue;
+        }
+      }
+
+      // Deterministic search matching across normalized fields (title, company, location, skills)
+      if (params.search && params.search.trim()) {
+        const q = params.search.toLowerCase().trim();
+        const inTitle = domainJob.title.toLowerCase().includes(q);
+        const inCompany = domainJob.company.toLowerCase().includes(q);
+        const inLocation = (domainJob.location || '').toLowerCase().includes(q);
+        const inDesc = (domainJob.description || '').toLowerCase().includes(q);
+        const inSkills =
+          (domainJob.requiredSkills || []).some((s) => s.toLowerCase().includes(q)) ||
+          (domainJob.preferredSkills || []).some((s) => s.toLowerCase().includes(q));
+        if (!inTitle && !inCompany && !inLocation && !inSkills && !inDesc) {
+          continue;
+        }
+      }
+
+      const priority = calculateOpportunityPriority(
+        domainJob,
+        candidateId,
+        match,
+        preferences,
+        domainSources,
+        DEFAULT_RANKING_CONFIG,
+        evaluationDate
+      );
+
+      eligibleOpportunities.push({
+        job: domainJob,
+        priority,
+        match,
+        primarySource,
+        candidateState,
+        applicationStatus
+      });
+    }
+
+    // 5. Canonical Deterministic Discovery Ordering:
+    // Recommended MUST always use Opportunity Priority
+    const effectiveSort =
+      params.tab === 'recommended' || !params.tab ? 'priority' : params.sort || 'priority';
+
+    let sorted: RankedOpportunity[];
+    if (effectiveSort === 'match_desc') {
+      sorted = eligibleOpportunities.toSorted((a, b) => {
+        const aMatch = a.match?.score ?? 0;
+        const bMatch = b.match?.score ?? 0;
+        if (bMatch !== aMatch) return bMatch - aMatch;
+        return compareDiscoveryOrder(
+          { priorityScore: a.priority.priorityScore, postedDate: a.job.postedDate, id: a.job.id },
+          { priorityScore: b.priority.priorityScore, postedDate: b.job.postedDate, id: b.job.id }
+        );
+      });
+    } else if (effectiveSort === 'recent') {
+      sorted = eligibleOpportunities.toSorted((a, b) => {
+        const aDate = a.job.postedDate ? new Date(a.job.postedDate).getTime() : 0;
+        const bDate = b.job.postedDate ? new Date(b.job.postedDate).getTime() : 0;
+        if (bDate !== aDate) return bDate - aDate;
+        return compareDiscoveryOrder(
+          { priorityScore: a.priority.priorityScore, postedDate: a.job.postedDate, id: a.job.id },
+          { priorityScore: b.priority.priorityScore, postedDate: b.job.postedDate, id: b.job.id }
+        );
+      });
+    } else {
+      // 1. Priority DESC
+      // 2. postedDate DESC NULLS LAST
+      // 3. id ASC
+      sorted = eligibleOpportunities.toSorted((a, b) =>
+        compareDiscoveryOrder(
+          { priorityScore: a.priority.priorityScore, postedDate: a.job.postedDate, id: a.job.id },
+          { priorityScore: b.priority.priorityScore, postedDate: b.job.postedDate, id: b.job.id }
+        )
+      );
+    }
+
+    // 6. Keyset filtering strictly after cursor
+    let filteredItems = sorted;
+    if (cursorPayload) {
+      if (effectiveSort === 'priority') {
+        filteredItems = sorted.filter((item) =>
+          isRowAfterCursor(
+            {
+              priorityScore: item.priority.priorityScore,
+              postedDate: item.job.postedDate,
+              id: item.job.id
+            },
+            cursorPayload!
+          )
+        );
+      } else {
+        const cursorIdx = sorted.findIndex((item) => item.job.id === cursorPayload!.i);
+        if (cursorIdx >= 0) {
+          filteredItems = sorted.slice(cursorIdx + 1);
+        }
+      }
+    }
+
+    // 7. Keyset pagination slice
+    const pageItems = filteredItems.slice(0, pageSize);
+    const hasMore = filteredItems.length > pageSize;
+
+    let nextCursor: string | null = null;
+    if (hasMore && pageItems.length > 0) {
+      const lastItem = pageItems[pageItems.length - 1];
+      nextCursor = encodeCursor({
+        p: lastItem.priority.priorityScore,
+        d: lastItem.job.postedDate ? new Date(lastItem.job.postedDate).toISOString() : null,
+        i: lastItem.job.id,
+        ctx: rankingContextKey,
+        e: evaluatedAtIso
+      });
+    }
+
+    return {
+      items: pageItems,
+      nextCursor,
+      hasMore,
+      totalEligible: sorted.length,
+      rankingContextKey,
+      evaluatedAt: evaluatedAtIso,
+      cursorReset: cursorReset ? true : undefined
+    };
+  }
+
   // --- Candidate Knowledge Bank & Provenance ---
   async getKnowledgeBank(candidateId?: string): Promise<CandidateKnowledgeBank> {
-    const candId = candidateId || DEFAULT_DEMO_CANDIDATE_ID;
+    const candId = resolveCandidateId(candidateId);
     const items = await prisma.knowledgeItem.findMany({
       where: { candidateId: candId },
       include: {
@@ -1165,7 +2126,7 @@ export class PrismaCareerRepository implements ICareerRepository {
   }
 
   async getKnowledgeItemById(itemId: string, candidateId?: string): Promise<KnowledgeItem | null> {
-    const candId = candidateId || DEFAULT_DEMO_CANDIDATE_ID;
+    const candId = resolveCandidateId(candidateId);
     const k = await prisma.knowledgeItem.findFirst({
       where: { id: itemId, candidateId: candId },
       include: { provenance: true }
@@ -1193,7 +2154,7 @@ export class PrismaCareerRepository implements ICareerRepository {
   }
 
   async saveKnowledgeItem(item: KnowledgeItem, candidateId?: string): Promise<KnowledgeItem> {
-    const candId = candidateId || item.candidateId || DEFAULT_DEMO_CANDIDATE_ID;
+    const candId = resolveCandidateId(candidateId || item.candidateId, 'saveKnowledgeItem');
 
     const saved = await prisma.knowledgeItem.upsert({
       where: { id: item.id },
@@ -1223,13 +2184,42 @@ export class PrismaCareerRepository implements ICareerRepository {
       include: { provenance: true }
     });
 
+    if (item.provenance && item.provenance.length > 0) {
+      for (const p of item.provenance) {
+        await prisma.knowledgeProvenance.upsert({
+          where: { id: p.id },
+          create: {
+            id: p.id,
+            knowledgeItemId: saved.id,
+            sourceType: p.sourceType,
+            sourceLabel: p.sourceLabel,
+            documentId: p.documentId || null,
+            extractedSnippet: p.extractedSnippet || null,
+            confidence: p.confidence ?? null,
+            addedAt: p.addedAt ? new Date(p.addedAt) : new Date()
+          },
+          update: {
+            sourceLabel: p.sourceLabel,
+            extractedSnippet: p.extractedSnippet || null,
+            confidence: p.confidence ?? null
+          }
+        });
+      }
+    }
+
+    const reloaded = await prisma.knowledgeItem.findUnique({
+      where: { id: saved.id },
+      include: { provenance: true }
+    });
+    const finalItem = reloaded || saved;
+
     return {
-      id: saved.id,
-      candidateId: saved.candidateId,
-      category: saved.category as unknown as KnowledgeItem['category'],
-      content: saved.content as unknown as KnowledgeItem['content'],
-      status: saved.status as unknown as KnowledgeItem['status'],
-      provenance: saved.provenance.map((p) => ({
+      id: finalItem.id,
+      candidateId: finalItem.candidateId,
+      category: finalItem.category as unknown as KnowledgeItem['category'],
+      content: finalItem.content as unknown as KnowledgeItem['content'],
+      status: finalItem.status as unknown as KnowledgeItem['status'],
+      provenance: finalItem.provenance.map((p) => ({
         id: p.id,
         sourceType: p.sourceType as unknown as KnowledgeProvenance['sourceType'],
         sourceLabel: p.sourceLabel,
@@ -1238,8 +2228,8 @@ export class PrismaCareerRepository implements ICareerRepository {
         confidence: p.confidence || undefined,
         addedAt: p.addedAt.toISOString()
       })),
-      createdAt: saved.createdAt.toISOString(),
-      updatedAt: saved.updatedAt.toISOString()
+      createdAt: finalItem.createdAt.toISOString(),
+      updatedAt: finalItem.updatedAt.toISOString()
     };
   }
 
@@ -1266,7 +2256,7 @@ export class PrismaCareerRepository implements ICareerRepository {
     status: KnowledgeStatus,
     candidateId?: string
   ): Promise<KnowledgeItem> {
-    const candId = candidateId || DEFAULT_DEMO_CANDIDATE_ID;
+    const candId = resolveCandidateId(candidateId);
     const updated = await prisma.knowledgeItem.update({
       where: { id: itemId },
       data: { status, updatedAt: new Date() },
@@ -1299,7 +2289,7 @@ export class PrismaCareerRepository implements ICareerRepository {
   }
 
   async deleteKnowledgeItem(itemId: string, candidateId?: string): Promise<boolean> {
-    const candId = candidateId || DEFAULT_DEMO_CANDIDATE_ID;
+    const candId = resolveCandidateId(candidateId);
     const res = await prisma.knowledgeItem.deleteMany({
       where: { id: itemId, candidateId: candId }
     });
@@ -1308,7 +2298,7 @@ export class PrismaCareerRepository implements ICareerRepository {
 
   // --- Ingestion Batches & Documents ---
   async getProposedBatches(candidateId?: string): Promise<ProposedIngestionBatch[]> {
-    const candId = candidateId || DEFAULT_DEMO_CANDIDATE_ID;
+    const candId = resolveCandidateId(candidateId);
     const batches = await prisma.resumeIngestionBatch.findMany({
       where: { candidateId: candId },
       orderBy: { uploadedAt: 'desc' }
@@ -1317,7 +2307,9 @@ export class PrismaCareerRepository implements ICareerRepository {
     return batches.map((b) => ({
       id: b.id,
       candidateId: b.candidateId,
+      documentId: b.documentId || undefined,
       fileName: b.fileName,
+      rawText: b.rawText || undefined,
       uploadedAt: b.uploadedAt.toISOString(),
       items: b.items as unknown as ProposedIngestionBatch['items'],
       status: b.status as unknown as ProposedIngestionBatch['status']
@@ -1328,11 +2320,13 @@ export class PrismaCareerRepository implements ICareerRepository {
     batch: Omit<ProposedIngestionBatch, 'id' | 'uploadedAt'>,
     candidateId?: string
   ): Promise<ProposedIngestionBatch> {
-    const candId = candidateId || batch.candidateId || DEFAULT_DEMO_CANDIDATE_ID;
+    const candId = resolveCandidateId(candidateId || batch.candidateId, 'createProposedBatch');
     const b = await prisma.resumeIngestionBatch.create({
       data: {
         candidateId: candId,
+        documentId: batch.documentId || null,
         fileName: batch.fileName,
+        rawText: batch.rawText || null,
         items: batch.items as unknown as Prisma.InputJsonValue,
         status: batch.status || 'pending_review'
       }
@@ -1341,7 +2335,9 @@ export class PrismaCareerRepository implements ICareerRepository {
     return {
       id: b.id,
       candidateId: b.candidateId,
+      documentId: b.documentId || undefined,
       fileName: b.fileName,
+      rawText: b.rawText || undefined,
       uploadedAt: b.uploadedAt.toISOString(),
       items: b.items as unknown as ProposedIngestionBatch['items'],
       status: b.status as unknown as ProposedIngestionBatch['status']
@@ -1352,7 +2348,7 @@ export class PrismaCareerRepository implements ICareerRepository {
     batchId: string,
     candidateId?: string
   ): Promise<ProposedIngestionBatch> {
-    const candId = candidateId || DEFAULT_DEMO_CANDIDATE_ID;
+    const candId = resolveCandidateId(candidateId);
     const existing = await prisma.resumeIngestionBatch.findFirst({
       where: { id: batchId, candidateId: candId }
     });
@@ -1373,7 +2369,9 @@ export class PrismaCareerRepository implements ICareerRepository {
     return {
       id: b.id,
       candidateId: b.candidateId,
+      documentId: b.documentId || undefined,
       fileName: b.fileName,
+      rawText: b.rawText || undefined,
       uploadedAt: b.uploadedAt.toISOString(),
       items: b.items as unknown as ProposedIngestionBatch['items'],
       status: b.status as unknown as ProposedIngestionBatch['status']
@@ -1384,18 +2382,22 @@ export class PrismaCareerRepository implements ICareerRepository {
     batch: ProposedIngestionBatch,
     candidateId?: string
   ): Promise<ProposedIngestionBatch> {
-    const candId = candidateId || batch.candidateId || DEFAULT_DEMO_CANDIDATE_ID;
+    const candId = resolveCandidateId(candidateId || batch.candidateId, 'saveProposedBatch');
     const b = await prisma.resumeIngestionBatch.upsert({
       where: { id: batch.id },
       create: {
         id: batch.id,
         candidateId: candId,
+        documentId: batch.documentId || null,
         fileName: batch.fileName,
+        rawText: batch.rawText || null,
         items: batch.items as unknown as Prisma.InputJsonValue,
         status: batch.status || 'pending_review'
       },
       update: {
         fileName: batch.fileName,
+        documentId: batch.documentId || undefined,
+        rawText: batch.rawText || undefined,
         items: batch.items as unknown as Prisma.InputJsonValue,
         status: batch.status
       }
@@ -1404,7 +2406,9 @@ export class PrismaCareerRepository implements ICareerRepository {
     return {
       id: b.id,
       candidateId: b.candidateId,
+      documentId: b.documentId || undefined,
       fileName: b.fileName,
+      rawText: b.rawText || undefined,
       uploadedAt: b.uploadedAt.toISOString(),
       items: b.items as unknown as ProposedIngestionBatch['items'],
       status: b.status as unknown as ProposedIngestionBatch['status']
@@ -1412,7 +2416,7 @@ export class PrismaCareerRepository implements ICareerRepository {
   }
 
   async deleteProposedBatch(batchId: string, candidateId?: string): Promise<boolean> {
-    const candId = candidateId || DEFAULT_DEMO_CANDIDATE_ID;
+    const candId = resolveCandidateId(candidateId);
     const res = await prisma.resumeIngestionBatch.deleteMany({
       where: { id: batchId, candidateId: candId }
     });
@@ -1420,7 +2424,7 @@ export class PrismaCareerRepository implements ICareerRepository {
   }
 
   async getCandidateDocuments(candidateId?: string): Promise<CandidateDocument[]> {
-    const candId = candidateId || DEFAULT_DEMO_CANDIDATE_ID;
+    const candId = resolveCandidateId(candidateId);
     const docs = await prisma.candidateDocument.findMany({
       where: { candidateId: candId },
       orderBy: { uploadedAt: 'desc' }
@@ -1443,7 +2447,7 @@ export class PrismaCareerRepository implements ICareerRepository {
     doc: Omit<CandidateDocument, 'id' | 'uploadedAt'>,
     candidateId?: string
   ): Promise<CandidateDocument> {
-    const candId = candidateId || doc.candidateId || DEFAULT_DEMO_CANDIDATE_ID;
+    const candId = resolveCandidateId(candidateId || doc.candidateId, 'createCandidateDocument');
     const d = await prisma.candidateDocument.create({
       data: {
         candidateId: candId,
@@ -1473,7 +2477,7 @@ export class PrismaCareerRepository implements ICareerRepository {
     documentId: string,
     candidateId?: string
   ): Promise<CandidateDocument | null> {
-    const candId = candidateId || DEFAULT_DEMO_CANDIDATE_ID;
+    const candId = resolveCandidateId(candidateId);
     const d = await prisma.candidateDocument.findFirst({
       where: { id: documentId, candidateId: candId }
     });
@@ -1493,7 +2497,7 @@ export class PrismaCareerRepository implements ICareerRepository {
   }
 
   async deleteCandidateDocument(documentId: string, candidateId?: string): Promise<boolean> {
-    const candId = candidateId || DEFAULT_DEMO_CANDIDATE_ID;
+    const candId = resolveCandidateId(candidateId);
     const doc = await prisma.candidateDocument.findFirst({
       where: { id: documentId, candidateId: candId }
     });
@@ -1509,7 +2513,7 @@ export class PrismaCareerRepository implements ICareerRepository {
   }
 
   async getResumeExportRecords(candidateId?: string): Promise<ResumeExport[]> {
-    const candId = candidateId || DEFAULT_DEMO_CANDIDATE_ID;
+    const candId = resolveCandidateId(candidateId);
     const exports = await prisma.resumeExportRecord.findMany({
       where: { candidateId: candId },
       orderBy: { createdAt: 'desc' }
@@ -1533,7 +2537,10 @@ export class PrismaCareerRepository implements ICareerRepository {
     record: Omit<ResumeExport, 'id' | 'createdAt'>,
     candidateId?: string
   ): Promise<ResumeExport> {
-    const candId = candidateId || record.candidateId || DEFAULT_DEMO_CANDIDATE_ID;
+    const candId = resolveCandidateId(
+      candidateId || record.candidateId,
+      'createResumeExportRecord'
+    );
     const e = await prisma.resumeExportRecord.create({
       data: {
         candidateId: candId,
@@ -1607,7 +2614,9 @@ export class PrismaCareerRepository implements ICareerRepository {
     // Step 2: Execute strictly ordered topological deletion inside a PostgreSQL transaction
     // Respects all foreign-key constraints (including onDelete: Restrict on tailoredResumeVersion)
     await prisma.$transaction(async (tx) => {
-      // 0a. Delete candidate's SavedSearches and CandidateJobStates
+      // 0a. Delete candidate's CandidateNotifications, SavedSearchAlerts, SavedSearches and CandidateJobStates
+      await tx.candidateNotification.deleteMany({ where: { candidateId } });
+      await tx.savedSearchAlert.deleteMany({ where: { candidateId } });
       await tx.savedSearch.deleteMany({ where: { candidateId } });
       await tx.candidateJobState.deleteMany({ where: { candidateId } });
 
@@ -1751,7 +2760,7 @@ export class PrismaCareerRepository implements ICareerRepository {
 
   // --- Resumes & Tailoring ---
   async getResumeVersions(candidateId?: string): Promise<ResumeVersion[]> {
-    const candId = candidateId || DEFAULT_DEMO_CANDIDATE_ID;
+    const candId = resolveCandidateId(candidateId);
     const resumes = await prisma.resumeVersion.findMany({
       where: { candidateId: candId },
       include: { changes: true },
@@ -1762,7 +2771,7 @@ export class PrismaCareerRepository implements ICareerRepository {
   }
 
   async getResumeVersionById(id: string, candidateId?: string): Promise<ResumeVersion | null> {
-    const candId = candidateId || DEFAULT_DEMO_CANDIDATE_ID;
+    const candId = resolveCandidateId(candidateId);
     const r = await prisma.resumeVersion.findFirst({
       where: { id, candidateId: candId },
       include: { changes: true }
@@ -1777,7 +2786,7 @@ export class PrismaCareerRepository implements ICareerRepository {
   }
 
   async saveResumeVersion(version: ResumeVersion, candidateId?: string): Promise<ResumeVersion> {
-    const candId = candidateId || version.candidateId || DEFAULT_DEMO_CANDIDATE_ID;
+    const candId = resolveCandidateId(candidateId || version.candidateId, 'saveResumeVersion');
     const versionId =
       version.id || `res_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
@@ -1841,7 +2850,7 @@ export class PrismaCareerRepository implements ICareerRepository {
     jobId: string,
     candidateId?: string
   ): Promise<ResumeVersion | null> {
-    const candId = candidateId || DEFAULT_DEMO_CANDIDATE_ID;
+    const candId = resolveCandidateId(candidateId);
     const r = await prisma.resumeVersion.findFirst({
       where: { jobId, candidateId: candId },
       include: { changes: true }
@@ -1964,7 +2973,7 @@ export class PrismaCareerRepository implements ICareerRepository {
     filters?: { status?: string; search?: string; sort?: string; includeArchived?: boolean },
     candidateId?: string
   ): Promise<ApplicationWithJob[]> {
-    const candId = candidateId || DEFAULT_DEMO_CANDIDATE_ID;
+    const candId = resolveCandidateId(candidateId);
     const apps = await prisma.application.findMany({
       where: {
         candidateId: candId,
@@ -1986,7 +2995,7 @@ export class PrismaCareerRepository implements ICareerRepository {
       job: this.mapJob(app.job)
     }));
 
-    if (filters?.search?.trim()) {
+    if (typeof filters?.search === 'string' && filters.search.trim()) {
       const q = filters.search.toLowerCase().trim();
       mapped = mapped.filter((a) => {
         const comp = a.job.company.toLowerCase();
@@ -2004,7 +3013,7 @@ export class PrismaCareerRepository implements ICareerRepository {
   }
 
   async getApplicationById(id: string, candidateId?: string): Promise<ApplicationDetail | null> {
-    const candId = candidateId || DEFAULT_DEMO_CANDIDATE_ID;
+    const candId = resolveCandidateId(candidateId);
     const a = await prisma.application.findFirst({
       where: { id, candidateId: candId },
       include: {
@@ -2058,7 +3067,7 @@ export class PrismaCareerRepository implements ICareerRepository {
   }
 
   async getApplicationByJobId(jobId: string, candidateId?: string): Promise<Application | null> {
-    const candId = candidateId || DEFAULT_DEMO_CANDIDATE_ID;
+    const candId = resolveCandidateId(candidateId);
     const a = await prisma.application.findFirst({
       where: { jobId, candidateId: candId, isArchived: false },
       include: {
@@ -2076,7 +3085,7 @@ export class PrismaCareerRepository implements ICareerRepository {
     options?: { allowDuplicate?: boolean },
     candidateId?: string
   ): Promise<Application> {
-    const candId = candidateId || DEFAULT_DEMO_CANDIDATE_ID;
+    const candId = resolveCandidateId(candidateId);
     const existing = await prisma.application.findFirst({
       where: { jobId, candidateId: candId, isArchived: false },
       include: { interviewStages: true, contacts: true, exports: true }
@@ -2111,7 +3120,7 @@ export class PrismaCareerRepository implements ICareerRepository {
     candidateId?: string,
     expectedVersion?: number
   ): Promise<Application> {
-    const candId = candidateId || DEFAULT_DEMO_CANDIDATE_ID;
+    const candId = resolveCandidateId(candidateId);
 
     return await prisma.$transaction(async (tx) => {
       // 1. Fetch application with candidate isolation
@@ -2272,7 +3281,7 @@ export class PrismaCareerRepository implements ICareerRepository {
     candidateId?: string,
     expectedVersion?: number
   ): Promise<Application> {
-    const candId = candidateId || DEFAULT_DEMO_CANDIDATE_ID;
+    const candId = resolveCandidateId(candidateId);
 
     return await prisma.$transaction(async (tx) => {
       const existing = await tx.application.findFirst({
@@ -2346,7 +3355,7 @@ export class PrismaCareerRepository implements ICareerRepository {
     candidateId?: string,
     expectedVersion?: number
   ): Promise<Application> {
-    const candId = candidateId || DEFAULT_DEMO_CANDIDATE_ID;
+    const candId = resolveCandidateId(candidateId);
     const app = await prisma.application.findFirst({ where: { id, candidateId: candId } });
     if (!app) throw new Error(`Application ${id} not found`);
 
@@ -2374,7 +3383,7 @@ export class PrismaCareerRepository implements ICareerRepository {
     candidateId?: string,
     expectedVersion?: number
   ): Promise<Application> {
-    const candId = candidateId || DEFAULT_DEMO_CANDIDATE_ID;
+    const candId = resolveCandidateId(candidateId);
     const app = await prisma.application.findFirst({ where: { id, candidateId: candId } });
     if (!app) throw new Error(`Application ${id} not found`);
 
@@ -2425,7 +3434,7 @@ export class PrismaCareerRepository implements ICareerRepository {
     exportRecord: ResumeExport,
     candidateId?: string
   ): Promise<Application> {
-    const candId = candidateId || DEFAULT_DEMO_CANDIDATE_ID;
+    const candId = resolveCandidateId(candidateId);
     await prisma.resumeExportRecord.create({
       data: {
         id: exportRecord.id,
@@ -2451,7 +3460,7 @@ export class PrismaCareerRepository implements ICareerRepository {
     applicationId?: string,
     candidateId?: string
   ): Promise<ApplicationEvent[]> {
-    const candId = candidateId || DEFAULT_DEMO_CANDIDATE_ID;
+    const candId = resolveCandidateId(candidateId);
     const events = await prisma.applicationEvent.findMany({
       where: {
         candidateId: candId,
@@ -2477,7 +3486,7 @@ export class PrismaCareerRepository implements ICareerRepository {
     event: Omit<ApplicationEvent, 'id' | 'timestamp'>,
     candidateId?: string
   ): Promise<ApplicationEvent> {
-    const candId = candidateId || DEFAULT_DEMO_CANDIDATE_ID;
+    const candId = resolveCandidateId(candidateId);
     const e = await prisma.applicationEvent.create({
       data: {
         candidateId: candId,
@@ -2510,7 +3519,7 @@ export class PrismaCareerRepository implements ICareerRepository {
     candidateId?: string,
     expectedVersion?: number
   ): Promise<Application> {
-    const candId = candidateId || DEFAULT_DEMO_CANDIDATE_ID;
+    const candId = resolveCandidateId(candidateId);
 
     return await prisma.$transaction(async (tx) => {
       const app = await tx.application.findFirst({
@@ -2585,7 +3594,7 @@ export class PrismaCareerRepository implements ICareerRepository {
     stage: Omit<InterviewStage, 'id'>,
     candidateId?: string
   ): Promise<Application> {
-    const candId = candidateId || DEFAULT_DEMO_CANDIDATE_ID;
+    const candId = resolveCandidateId(candidateId);
 
     return await prisma.$transaction(async (tx) => {
       const app = await tx.application.findFirst({
@@ -2639,7 +3648,7 @@ export class PrismaCareerRepository implements ICareerRepository {
     stage: InterviewStage,
     candidateId?: string
   ): Promise<Application> {
-    const candId = candidateId || DEFAULT_DEMO_CANDIDATE_ID;
+    const candId = resolveCandidateId(candidateId);
 
     return await prisma.$transaction(async (tx) => {
       const app = await tx.application.findFirst({
@@ -2695,7 +3704,7 @@ export class PrismaCareerRepository implements ICareerRepository {
     stageId: string,
     candidateId?: string
   ): Promise<Application> {
-    const candId = candidateId || DEFAULT_DEMO_CANDIDATE_ID;
+    const candId = resolveCandidateId(candidateId);
 
     return await prisma.$transaction(async (tx) => {
       const app = await tx.application.findFirst({
@@ -2725,7 +3734,7 @@ export class PrismaCareerRepository implements ICareerRepository {
     contact: Omit<ApplicationContact, 'id' | 'createdAt'>,
     candidateId?: string
   ): Promise<Application> {
-    const candId = candidateId || DEFAULT_DEMO_CANDIDATE_ID;
+    const candId = resolveCandidateId(candidateId);
 
     return await prisma.$transaction(async (tx) => {
       const app = await tx.application.findFirst({
@@ -2776,7 +3785,7 @@ export class PrismaCareerRepository implements ICareerRepository {
     updates: Partial<ApplicationContact>,
     candidateId?: string
   ): Promise<Application> {
-    const candId = candidateId || DEFAULT_DEMO_CANDIDATE_ID;
+    const candId = resolveCandidateId(candidateId);
 
     return await prisma.$transaction(async (tx) => {
       const app = await tx.application.findFirst({
@@ -2814,7 +3823,7 @@ export class PrismaCareerRepository implements ICareerRepository {
     contactId: string,
     candidateId?: string
   ): Promise<Application> {
-    const candId = candidateId || DEFAULT_DEMO_CANDIDATE_ID;
+    const candId = resolveCandidateId(candidateId);
 
     return await prisma.$transaction(async (tx) => {
       const app = await tx.application.findFirst({
@@ -2845,7 +3854,7 @@ export class PrismaCareerRepository implements ICareerRepository {
     candidateId?: string,
     expectedVersion?: number
   ): Promise<Application> {
-    const candId = candidateId || DEFAULT_DEMO_CANDIDATE_ID;
+    const candId = resolveCandidateId(candidateId);
 
     return await prisma.$transaction(async (tx) => {
       const app = await tx.application.findFirst({
@@ -2875,7 +3884,7 @@ export class PrismaCareerRepository implements ICareerRepository {
 
   // --- Search Intelligence, Analytics & Next Actions ---
   async getDashboardOverview(candidateId?: string): Promise<DashboardOverviewResponse> {
-    const candId = candidateId || DEFAULT_DEMO_CANDIDATE_ID;
+    const candId = resolveCandidateId(candidateId);
     const candidate = await this.getCandidateProfile(candId);
     const jobs = await this.getJobs({}, candId);
     const applications = await this.getApplications({ includeArchived: true }, candId);
@@ -3138,10 +4147,39 @@ export class PrismaCareerRepository implements ICareerRepository {
       currency: s.currency,
       alertFrequency: s.alertFrequency,
       filterVersion: s.filterVersion,
+      isEnabled: s.isEnabled,
+      minMatchScore: s.minMatchScore,
       lastExecutedAt: s.lastExecutedAt,
       lastMatchCount: s.lastMatchCount,
       createdAt: s.createdAt,
       updatedAt: s.updatedAt
+    };
+  }
+
+  private mapSavedSearchAlert(a: PrismaSavedSearchAlert): SavedSearchAlert {
+    return {
+      id: a.id,
+      candidateId: a.candidateId,
+      savedSearchId: a.savedSearchId,
+      jobId: a.jobId,
+      savedSearchVersion: a.savedSearchVersion,
+      generatedAt: a.generatedAt,
+      deliveredAt: a.deliveredAt,
+      status: a.status
+    };
+  }
+
+  private mapCandidateNotification(n: PrismaCandidateNotification): CandidateNotification {
+    return {
+      id: n.id,
+      candidateId: n.candidateId,
+      type: n.type,
+      title: n.title,
+      message: n.message,
+      relatedJobId: n.relatedJobId,
+      relatedSavedSearchId: n.relatedSavedSearchId,
+      readAt: n.readAt,
+      createdAt: n.createdAt
     };
   }
 }

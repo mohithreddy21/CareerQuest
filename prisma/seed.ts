@@ -6,6 +6,12 @@ import { extractResumeContent } from '../src/types/resume-content';
 const prisma = new PrismaClient();
 
 async function main() {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      'CRITICAL SAFETY CHECK: prisma/seed.ts is a development fixture and cannot be run in production.'
+    );
+  }
+
   console.log('🌱 Starting CareerQuest Phase 6A database seed...');
 
   const data = initialCareerData;

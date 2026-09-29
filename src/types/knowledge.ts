@@ -125,7 +125,9 @@ export interface ProposedKnowledgeItem {
 export interface ProposedIngestionBatch {
   id: string;
   candidateId: string;
+  documentId?: string;
   fileName: string;
+  rawText?: string;
   uploadedAt: string;
   items: ProposedKnowledgeItem[];
   status: 'pending_review' | 'resolved';

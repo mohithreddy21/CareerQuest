@@ -13,7 +13,9 @@ export const searchParams = {
   status: parseAsString,
   workArrangement: parseAsString,
   sort: parseAsString,
-  minMatch: parseAsInteger
+  minMatch: parseAsInteger,
+  tab: parseAsString,
+  stateFilter: parseAsString
 };
 
 export const searchParamsCache = createSearchParamsCache(searchParams);

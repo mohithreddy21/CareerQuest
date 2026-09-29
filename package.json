@@ -26,7 +26,13 @@
     "verify:phase6b": "tsx scripts/verify-phase6b.ts",
     "verify:phase6c": "tsx scripts/verify-phase6c.ts",
     "verify:phase7a": "tsx scripts/verify-phase7a.ts",
-    "verify:phase7b": "tsx scripts/verify-phase7b.ts"
+    "verify:phase7b": "tsx scripts/verify-phase7b.ts",
+    "verify:phase7c": "tsx scripts/verify-phase7c.ts",
+    "verify:phase7d": "tsx scripts/verify-phase7d.ts",
+    "verify:phase7e": "tsx scripts/verify-phase7e.ts",
+    "verify:phase7f": "tsx scripts/verify-phase7f.ts",
+    "verify:pdf-regression": "tsx scripts/verify-pdf-extraction-regression.ts",
+    "verify:production-readiness": "tsx scripts/verify-production-readiness.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -81,6 +87,7 @@
     "tailwindcss": "^4.2.2",
     "tailwindcss-animate": "^1.0.7",
     "typescript": "5.7.2",
+    "unpdf": "^1.8.1",
     "uuid": "^11.1.0",
     "vaul": "^1.1.2",
     "zod": "^4.3.6",

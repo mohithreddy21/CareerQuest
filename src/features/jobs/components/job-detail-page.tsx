@@ -1,7 +1,16 @@
 'use client';
 
-import { useMutation, useSuspenseQuery } from '@tanstack/react-query';
-import { jobAnalysisOptions, jobByIdOptions, jobMatchOptions } from '../api/queries';
+import { useMutation, useSuspenseQuery, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  jobAnalysisOptions,
+  jobByIdOptions,
+  jobMatchOptions,
+  opportunityPriorityOptions,
+  jobSourceReferencesQueryOptions,
+  candidateJobStateQueryOptions,
+  discoveryKeys
+} from '../api/queries';
+import { setCandidateJobStateAction, undoCandidateJobStateAction } from '../api/actions';
 import { analyzeJobMutation } from '../api/mutations';
 import { createApplicationMutation } from '@/features/applications/api/mutations';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -16,15 +25,70 @@ import { MatchScoreCard } from './match-score-card';
 import { MatchBreakdown } from './match-breakdown';
 import { JobAnalysisDetails } from './job-analysis-details';
 import { AnalysisLifecycleState } from './analysis-lifecycle-state';
-import { AnalysisStatus } from '@/types/domain';
+import { AnalysisStatus, CandidateJobStatus } from '@/types/domain';
 
 export default function JobDetailPage({ jobId }: { jobId: string }) {
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   // 1. Data Fetching via React Query
   const { data: job } = useSuspenseQuery(jobByIdOptions(jobId));
   const { data: analysis } = useSuspenseQuery(jobAnalysisOptions(jobId));
   const { data: match } = useSuspenseQuery(jobMatchOptions(jobId));
+  const { data: priority } = useQuery(opportunityPriorityOptions(jobId));
+  const { data: sources = [] } = useQuery(jobSourceReferencesQueryOptions(jobId));
+  const { data: candidateState } = useQuery(candidateJobStateQueryOptions(jobId));
+
+  const isSaved = candidateState?.status === 'SAVED';
+  const isDismissed = candidateState?.status === 'DISMISSED';
+
+  const handleSaveToggle = async () => {
+    if (!job) return;
+    const targetStatus: CandidateJobStatus = isSaved ? 'UNSEEN' : 'SAVED';
+    try {
+      await setCandidateJobStateAction({ jobId: job.id, status: targetStatus });
+      await queryClient.invalidateQueries({ queryKey: discoveryKeys.all });
+      toast.success(isSaved ? 'Removed from Saved' : 'Opportunity Saved', {
+        action: {
+          label: 'Undo',
+          onClick: async () => {
+            await undoCandidateJobStateAction({
+              jobId: job.id,
+              targetPreviousState: candidateState?.status || 'UNSEEN'
+            });
+            await queryClient.invalidateQueries({ queryKey: discoveryKeys.all });
+            toast.info('Undo successful');
+          }
+        }
+      });
+    } catch {
+      toast.error('Failed to update save status');
+    }
+  };
+
+  const handleDismissToggle = async () => {
+    if (!job) return;
+    const prevStatus = candidateState?.status || 'UNSEEN';
+    try {
+      await setCandidateJobStateAction({ jobId: job.id, status: 'DISMISSED' });
+      await queryClient.invalidateQueries({ queryKey: discoveryKeys.all });
+      toast('Opportunity dismissed', {
+        action: {
+          label: 'Undo',
+          onClick: async () => {
+            await undoCandidateJobStateAction({
+              jobId: job.id,
+              targetPreviousState: prevStatus
+            });
+            await queryClient.invalidateQueries({ queryKey: discoveryKeys.all });
+            toast.success('Restored opportunity');
+          }
+        }
+      });
+    } catch {
+      toast.error('Failed to dismiss opportunity');
+    }
+  };
 
   // 2. Mutations
   const startAppMutation = useMutation({
@@ -174,9 +238,158 @@ export default function JobDetailPage({ jobId }: { jobId: string }) {
               <Icons.star className='mr-2 h-4 w-4' />
               Mark Interested
             </Button>
+
+            {/* Save Button */}
+            <Button
+              variant={isSaved ? 'secondary' : 'outline'}
+              size='default'
+              onClick={handleSaveToggle}
+              className={cn(
+                'min-h-[44px] flex-1 sm:flex-initial',
+                isSaved && 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30'
+              )}
+            >
+              {isSaved ? (
+                <>
+                  <Icons.check className='mr-2 h-4 w-4 text-amber-600' />
+                  Saved
+                </>
+              ) : (
+                <>
+                  <Icons.star className='mr-2 h-4 w-4' />
+                  Save
+                </>
+              )}
+            </Button>
+
+            {/* Dismiss Button */}
+            <Button
+              variant='ghost'
+              size='default'
+              onClick={handleDismissToggle}
+              className='min-h-[44px] flex-1 sm:flex-initial text-muted-foreground hover:text-destructive'
+            >
+              <Icons.close className='mr-2 h-4 w-4' />
+              {isDismissed ? 'Dismissed' : 'Dismiss'}
+            </Button>
           </div>
         </CardContent>
       </Card>
+
+      {/* 2.5 Opportunity Priority & Sources Card */}
+      <div className='grid grid-cols-1 gap-6 md:grid-cols-2'>
+        {/* Opportunity Priority Breakdown */}
+        <Card className='border-border/70 shadow-xs'>
+          <CardHeader className='pb-3'>
+            <div className='flex items-center justify-between'>
+              <CardTitle className='text-base font-semibold'>Opportunity Priority</CardTitle>
+              {priority && (
+                <Badge
+                  variant='outline'
+                  className='text-sm font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
+                >
+                  {priority.priorityScore.toFixed(0)} / 100
+                </Badge>
+              )}
+            </div>
+            <CardDescription className='text-xs'>
+              Synthesized ranking based on profile alignment (50%), preferences (35%), and freshness
+              (15%).
+            </CardDescription>
+          </CardHeader>
+          <CardContent className='pt-0 space-y-3'>
+            {priority ? (
+              <div className='grid grid-cols-3 gap-2 p-3 rounded-lg bg-muted/30 border text-center'>
+                <div>
+                  <div className='text-lg font-bold text-foreground'>
+                    {priority.breakdown.matchScore.toFixed(0)}%
+                  </div>
+                  <div className='text-[11px] text-muted-foreground font-medium'>Match (50%)</div>
+                </div>
+                <div>
+                  <div className='text-lg font-bold text-foreground'>
+                    {priority.breakdown.preferenceFit.toFixed(0)}%
+                  </div>
+                  <div className='text-[11px] text-muted-foreground font-medium'>
+                    Pref Fit (35%)
+                  </div>
+                </div>
+                <div>
+                  <div className='text-lg font-bold text-foreground'>
+                    {priority.breakdown.freshnessScore.toFixed(0)}%
+                  </div>
+                  <div className='text-[11px] text-muted-foreground font-medium'>
+                    Freshness (15%)
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className='text-xs text-muted-foreground py-2'>
+                Calculating Opportunity Priority...
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Sources & Acquisition Verification */}
+        <Card className='border-border/70 shadow-xs'>
+          <CardHeader className='pb-3'>
+            <div className='flex items-center justify-between'>
+              <CardTitle className='text-base font-semibold'>Verified Sources</CardTitle>
+              <Badge variant='outline' className='text-xs'>
+                {sources.length} {sources.length === 1 ? 'Source' : 'Sources'}
+              </Badge>
+            </div>
+            <CardDescription className='text-xs'>
+              Multi-source acquisition references and verification status.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className='pt-0 space-y-2'>
+            {sources.length > 0 ? (
+              sources.map((s) => (
+                <div
+                  key={s.id}
+                  className='flex items-center justify-between p-2.5 rounded-md border bg-muted/20 text-xs'
+                >
+                  <div className='flex items-center gap-2 min-w-0'>
+                    <Badge
+                      variant={s.isPrimary ? 'default' : 'secondary'}
+                      className='text-[10px] shrink-0'
+                    >
+                      {s.isPrimary ? 'Primary' : 'Alternative'}
+                    </Badge>
+                    <span className='font-medium capitalize truncate'>
+                      {s.source.replace('_', ' ')}
+                    </span>
+                  </div>
+                  <div className='flex items-center gap-2 shrink-0'>
+                    <Badge
+                      variant={s.sourceStatus === 'active' ? 'outline' : 'destructive'}
+                      className='text-[10px]'
+                    >
+                      {s.sourceStatus}
+                    </Badge>
+                    {s.sourceUrl && (
+                      <a
+                        href={s.sourceUrl}
+                        target='_blank'
+                        rel='noopener noreferrer'
+                        className='text-primary hover:underline inline-flex items-center gap-1'
+                      >
+                        Visit <Icons.externalLink className='h-3 w-3' />
+                      </a>
+                    )}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className='text-xs text-muted-foreground py-2'>
+                Direct source: {job.source.replace('_', ' ')}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       {/* 3. Match Decision Support or Analysis State */}
       {analysisStatus === 'success' && match ? (

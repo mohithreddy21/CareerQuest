@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { importJobMutation } from '../api/mutations';
+import { importJobMutation, importJobFromTextMutation } from '../api/mutations';
 import {
   Dialog,
   DialogContent,
@@ -14,19 +14,27 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Icons } from '@/components/icons';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 import { jobKeys } from '../api/queries';
 import { ImportJobPayload, ImportJobResponse, Job, JobMatch } from '../api/types';
+import { ImportJobFromTextPayload } from '../api/schemas';
 
 type ImportStep = 'input' | 'processing' | 'duplicate' | 'success';
+type InputMode = 'url' | 'paste';
 type ProcessingPhase = 'fetching' | 'extracting' | 'normalizing';
 
 export function JobImportDialog() {
   const [open, setOpen] = useState(false);
+  const [inputMode, setInputMode] = useState<InputMode>('url');
   const [url, setUrl] = useState('');
+  const [pastedText, setPastedText] = useState('');
+  const [pastedTitle, setPastedTitle] = useState('');
+  const [pastedCompany, setPastedCompany] = useState('');
   const [validationError, setValidationError] = useState<string | null>(null);
   const [step, setStep] = useState<ImportStep>('input');
   const [processingPhase, setProcessingPhase] = useState<ProcessingPhase>('fetching');
@@ -41,38 +49,56 @@ export function JobImportDialog() {
   const router = useRouter();
   const queryClient = useQueryClient();
 
-  const mutation = useMutation<ImportJobResponse, Error, ImportJobPayload>({
-    ...importJobMutation,
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: jobKeys.all });
+  const handleMutationSuccess = (data: ImportJobResponse) => {
+    queryClient.invalidateQueries({ queryKey: jobKeys.all });
 
-      if (data.isDuplicate && data.existingJob) {
-        setDuplicateJob(data.existingJob);
-        setDuplicateReason(data.error || 'A matching job already exists in your workspace.');
-        setStep('duplicate');
-        return;
-      }
+    if (data.isDuplicate && data.existingJob) {
+      setDuplicateJob(data.existingJob);
+      setDuplicateReason(data.error || 'A matching job already exists in your workspace.');
+      setStep('duplicate');
+      return;
+    }
 
-      if (data.success && data.job) {
-        setImportedJob(data.job);
-        setImportedMatch(data.match || null);
-        setAdapterName(data.adapterName || 'Direct Import');
-        setStep('success');
-        toast.success(`Imported: ${data.job.title} at ${data.job.company}`);
-      } else {
-        setValidationError(data.error || 'Could not parse job from this URL.');
-        setStep('input');
-      }
-    },
-    onError: (err: Error) => {
-      setValidationError(err?.message || 'Failed to import posting. Please check the URL.');
+    if (data.success && data.job) {
+      setImportedJob(data.job);
+      setImportedMatch(data.match || null);
+      setAdapterName(data.adapterName || 'Direct Import');
+      setStep('success');
+      toast.success(`Imported: ${data.job.title} at ${data.job.company}`);
+    } else {
+      setValidationError(data.error || 'Could not parse job from this source.');
       setStep('input');
     }
+  };
+
+  const handleMutationError = (err: Error) => {
+    setValidationError(
+      err?.message || 'Failed to import posting. Please check the provided details.'
+    );
+    setStep('input');
+  };
+
+  const urlMutation = useMutation<ImportJobResponse, Error, ImportJobPayload>({
+    ...importJobMutation,
+    onSuccess: handleMutationSuccess,
+    onError: handleMutationError
   });
+
+  const textMutation = useMutation<ImportJobResponse, Error, ImportJobFromTextPayload>({
+    ...importJobFromTextMutation,
+    onSuccess: handleMutationSuccess,
+    onError: handleMutationError
+  });
+
+  const isPending = urlMutation.isPending || textMutation.isPending;
 
   const resetState = () => {
     setUrl('');
+    setPastedText('');
+    setPastedTitle('');
+    setPastedCompany('');
     setValidationError(null);
+    setInputMode('url');
     setStep('input');
     setProcessingPhase('fetching');
     setDuplicateJob(null);
@@ -89,7 +115,7 @@ export function JobImportDialog() {
     setOpen(newOpen);
   };
 
-  const validateUrl = (rawUrl: string): boolean => {
+  const validateUrlInput = (rawUrl: string): boolean => {
     const trimmed = rawUrl.trim();
     if (!trimmed) {
       setValidationError('Please enter a job posting URL.');
@@ -115,27 +141,56 @@ export function JobImportDialog() {
     return true;
   };
 
+  const validatePasteInput = (rawText: string): boolean => {
+    const trimmed = rawText.trim();
+    if (!trimmed || trimmed.length < 20) {
+      setValidationError('Please paste a complete job description (at least 20 characters).');
+      return false;
+    }
+    if (trimmed.length > 50000) {
+      setValidationError('Job text exceeds maximum allowed length (50,000 characters).');
+      return false;
+    }
+    setValidationError(null);
+    return true;
+  };
+
   const executeImport = async (forceDuplicate = false) => {
-    if (!validateUrl(url)) return;
+    if (inputMode === 'url') {
+      if (!validateUrlInput(url)) return;
 
-    setStep('processing');
-    setProcessingPhase('fetching');
+      setStep('processing');
+      setProcessingPhase('fetching');
 
-    // Simulated phase 1: Fetching posting
-    await new Promise((r) => setTimeout(r, 450));
-    setProcessingPhase('extracting');
+      await new Promise((r) => setTimeout(r, 400));
+      setProcessingPhase('extracting');
 
-    // Simulated phase 2: Extracting requirements
-    await new Promise((r) => setTimeout(r, 450));
-    setProcessingPhase('normalizing');
+      await new Promise((r) => setTimeout(r, 400));
+      setProcessingPhase('normalizing');
 
-    // Simulated phase 3: Normalizing domain schema
-    await new Promise((r) => setTimeout(r, 300));
+      await new Promise((r) => setTimeout(r, 300));
 
-    await mutation.mutateAsync({
-      url: url.trim(),
-      force: forceDuplicate
-    });
+      await urlMutation.mutateAsync({
+        url: url.trim(),
+        force: forceDuplicate
+      });
+    } else {
+      if (!validatePasteInput(pastedText)) return;
+
+      setStep('processing');
+      setProcessingPhase('extracting');
+
+      await new Promise((r) => setTimeout(r, 450));
+      setProcessingPhase('normalizing');
+
+      await new Promise((r) => setTimeout(r, 350));
+
+      await textMutation.mutateAsync({
+        text: pastedText.trim(),
+        title: pastedTitle.trim() || undefined,
+        company: pastedCompany.trim() || undefined
+      });
+    }
   };
 
   const handleReviewExisting = () => {
@@ -158,81 +213,219 @@ export function JobImportDialog() {
         render={
           <Button variant='outline' size='default' className='gap-2 shadow-xs'>
             <Icons.add className='h-4 w-4' />
-            Add Job by URL
+            Import Job
           </Button>
         }
       />
-      <DialogContent className='sm:max-w-[540px]'>
+      <DialogContent className='sm:max-w-[560px]'>
         <DialogHeader>
           <DialogTitle className='text-lg font-semibold'>
-            {step === 'input' && 'Import Job by Public URL'}
-            {step === 'processing' && 'Processing Job Posting'}
+            {step === 'input' &&
+              (inputMode === 'url' ? 'Import Job from URL' : 'Paste Job Description')}
+            {step === 'processing' && 'Processing Job Opportunity'}
             {step === 'duplicate' && 'Potential Duplicate Detected'}
             {step === 'success' && 'Job Normalized Successfully'}
           </DialogTitle>
           <DialogDescription className='text-xs text-muted-foreground'>
             {step === 'input' &&
-              'Paste a public job posting URL from Greenhouse, Lever, LinkedIn, Indeed, Workday, or any company career page.'}
+              (inputMode === 'url'
+                ? 'Enter a public job posting URL from Greenhouse, Lever, LinkedIn, Indeed, Workday, or any company career page.'
+                : 'Paste the raw job description, requirements, responsibilities, or role details directly.')}
             {step === 'processing' &&
-              'Simulating external extraction and standardizing into the normalized Job contract.'}
+              'Extracting structured requirements, responsibilities, and normalizing to domain contract.'}
             {step === 'duplicate' &&
               'This opportunity appears to match an existing job already tracked in your workspace.'}
             {step === 'success' &&
-              'Posting normalized against profile criteria. All provenance is preserved.'}
+              'Posting normalized and stored in your workspace. Provenance and extraction quality tracked.'}
           </DialogDescription>
         </DialogHeader>
 
         {/* STEP 1: INPUT */}
         {step === 'input' && (
           <div className='space-y-4 py-2'>
-            <div className='space-y-2'>
-              <label htmlFor='job-import-url' className='text-xs font-medium text-foreground'>
-                Public Posting URL
-              </label>
-              <Input
-                id='job-import-url'
-                placeholder='https://boards.greenhouse.io/stripe/jobs/...'
-                value={url}
-                onChange={(e) => {
-                  setUrl(e.target.value);
-                  if (validationError) setValidationError(null);
+            {/* Mode Selector Tabs */}
+            <div className='flex rounded-lg border bg-muted/40 p-1'>
+              <button
+                type='button'
+                onClick={() => {
+                  setInputMode('url');
+                  setValidationError(null);
                 }}
-                disabled={mutation.isPending}
-                className={
-                  validationError ? 'border-destructive focus-visible:ring-destructive' : ''
-                }
-              />
-              {validationError && (
-                <div className='flex items-center gap-1.5 text-xs text-destructive font-medium'>
-                  <Icons.alertCircle className='h-3.5 w-3.5 shrink-0' />
-                  <span>{validationError}</span>
-                </div>
-              )}
+                className={cn(
+                  'flex-1 flex items-center justify-center gap-2 py-1.5 px-3 rounded-md text-xs font-medium transition-all',
+                  inputMode === 'url'
+                    ? 'bg-background text-foreground shadow-xs'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                <Icons.externalLink className='h-3.5 w-3.5' />
+                Import from URL
+              </button>
+              <button
+                type='button'
+                onClick={() => {
+                  setInputMode('paste');
+                  setValidationError(null);
+                }}
+                className={cn(
+                  'flex-1 flex items-center justify-center gap-2 py-1.5 px-3 rounded-md text-xs font-medium transition-all',
+                  inputMode === 'paste'
+                    ? 'bg-background text-foreground shadow-xs'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                <Icons.post className='h-3.5 w-3.5' />
+                Paste Description
+              </button>
             </div>
 
-            <div className='rounded-lg border bg-muted/40 p-3 text-xs space-y-1.5 text-muted-foreground'>
-              <p className='font-medium text-foreground'>Supported Source Adapters:</p>
-              <div className='flex flex-wrap gap-1.5 pt-0.5'>
-                <Badge variant='outline' className='text-[10px] font-normal'>
-                  Greenhouse
-                </Badge>
-                <Badge variant='outline' className='text-[10px] font-normal'>
-                  Lever
-                </Badge>
-                <Badge variant='outline' className='text-[10px] font-normal'>
-                  LinkedIn Jobs
-                </Badge>
-                <Badge variant='outline' className='text-[10px] font-normal'>
-                  Indeed
-                </Badge>
-                <Badge variant='outline' className='text-[10px] font-normal'>
-                  Workday
-                </Badge>
-                <Badge variant='outline' className='text-[10px] font-normal'>
-                  Generic Career Sites
-                </Badge>
+            {inputMode === 'url' ? (
+              <div className='space-y-4'>
+                <div className='space-y-2'>
+                  <label htmlFor='job-import-url' className='text-xs font-medium text-foreground'>
+                    Public Posting URL
+                  </label>
+                  <Input
+                    id='job-import-url'
+                    placeholder='https://boards.greenhouse.io/stripe/jobs/...'
+                    value={url}
+                    onChange={(e) => {
+                      setUrl(e.target.value);
+                      if (validationError) setValidationError(null);
+                    }}
+                    disabled={isPending}
+                    className={
+                      validationError ? 'border-destructive focus-visible:ring-destructive' : ''
+                    }
+                  />
+                  {validationError && (
+                    <div className='rounded-md border border-destructive/30 bg-destructive/10 p-2.5 text-xs text-destructive space-y-2'>
+                      <div className='flex items-start gap-2'>
+                        <Icons.alertCircle className='h-4 w-4 shrink-0 mt-0.5' />
+                        <div className='space-y-1 flex-1'>
+                          <p className='font-medium'>{validationError}</p>
+                          <p className='text-[11px] text-muted-foreground'>
+                            When a page cannot be scraped or requires authentication, paste the job
+                            text directly.
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        type='button'
+                        variant='secondary'
+                        size='sm'
+                        onClick={() => {
+                          setInputMode('paste');
+                          setValidationError(null);
+                        }}
+                        className='w-full gap-1.5 text-xs'
+                      >
+                        <Icons.post className='h-3.5 w-3.5' />
+                        Paste Job Description Instead
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
+                <div className='rounded-lg border bg-muted/40 p-3 text-xs space-y-1.5 text-muted-foreground'>
+                  <p className='font-medium text-foreground'>Supported Sources & Quality Gate:</p>
+                  <p className='text-[11px]'>
+                    Direct deterministic adapters for Greenhouse, Lever, Schema.org JSON-LD, plus
+                    generic semantic HTML extraction with automated quality validation.
+                  </p>
+                  <div className='flex flex-wrap gap-1.5 pt-1'>
+                    <Badge variant='outline' className='text-[10px] font-normal'>
+                      Greenhouse
+                    </Badge>
+                    <Badge variant='outline' className='text-[10px] font-normal'>
+                      Lever
+                    </Badge>
+                    <Badge variant='outline' className='text-[10px] font-normal'>
+                      JSON-LD / Schema.org
+                    </Badge>
+                    <Badge variant='outline' className='text-[10px] font-normal'>
+                      Company Career Sites
+                    </Badge>
+                    <Badge variant='outline' className='text-[10px] font-normal'>
+                      Extraction Quality Gate
+                    </Badge>
+                  </div>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className='space-y-3.5'>
+                <div className='grid grid-cols-1 sm:grid-cols-2 gap-2.5'>
+                  <div className='space-y-1.5'>
+                    <label
+                      htmlFor='paste-job-title'
+                      className='text-xs font-medium text-foreground'
+                    >
+                      Job Title{' '}
+                      <span className='text-muted-foreground font-normal'>(optional)</span>
+                    </label>
+                    <Input
+                      id='paste-job-title'
+                      placeholder='e.g., Senior Frontend Engineer'
+                      value={pastedTitle}
+                      onChange={(e) => setPastedTitle(e.target.value)}
+                      disabled={isPending}
+                    />
+                  </div>
+                  <div className='space-y-1.5'>
+                    <label
+                      htmlFor='paste-job-company'
+                      className='text-xs font-medium text-foreground'
+                    >
+                      Company / Organization{' '}
+                      <span className='text-muted-foreground font-normal'>(optional)</span>
+                    </label>
+                    <Input
+                      id='paste-job-company'
+                      placeholder='e.g., Stripe, Cisco, Acme Corp'
+                      value={pastedCompany}
+                      onChange={(e) => setPastedCompany(e.target.value)}
+                      disabled={isPending}
+                    />
+                  </div>
+                </div>
+
+                <div className='space-y-1.5'>
+                  <div className='flex items-center justify-between'>
+                    <label htmlFor='paste-job-text' className='text-xs font-medium text-foreground'>
+                      Job Description & Requirements <span className='text-destructive'>*</span>
+                    </label>
+                    <span className='text-[11px] text-muted-foreground'>
+                      {pastedText.length.toLocaleString()} / 50,000 chars
+                    </span>
+                  </div>
+                  <Textarea
+                    id='paste-job-text'
+                    rows={8}
+                    placeholder='Paste the job description, qualifications, responsibilities, requirements, or role overview here...'
+                    value={pastedText}
+                    onChange={(e) => {
+                      setPastedText(e.target.value);
+                      if (validationError) setValidationError(null);
+                    }}
+                    disabled={isPending}
+                    className={cn(
+                      'resize-y text-xs font-sans',
+                      validationError ? 'border-destructive focus-visible:ring-destructive' : ''
+                    )}
+                  />
+                  {validationError && (
+                    <div className='flex items-center gap-1.5 text-xs text-destructive font-medium'>
+                      <Icons.alertCircle className='h-3.5 w-3.5 shrink-0' />
+                      <span>{validationError}</span>
+                    </div>
+                  )}
+                  <p className='text-[11px] text-muted-foreground'>
+                    Includes deterministic section extraction and Gemini AI structuring without
+                    inventing requirements or compensation.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -240,30 +433,32 @@ export function JobImportDialog() {
         {step === 'processing' && (
           <div className='py-6 space-y-6'>
             <div className='space-y-3'>
-              {/* Phase 1: Fetching */}
-              <div className='flex items-center gap-3'>
-                <div
-                  className={`flex h-8 w-8 items-center justify-center rounded-full border text-xs font-semibold ${
-                    processingPhase === 'fetching'
-                      ? 'border-primary bg-primary text-primary-foreground animate-pulse'
-                      : 'border-emerald-500 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                  }`}
-                >
-                  {processingPhase === 'fetching' ? (
-                    <Icons.spinner className='h-4 w-4 animate-spin' />
-                  ) : (
-                    <Icons.check className='h-4 w-4' />
-                  )}
+              {/* Phase 1: Fetching (URL only) */}
+              {inputMode === 'url' && (
+                <div className='flex items-center gap-3'>
+                  <div
+                    className={`flex h-8 w-8 items-center justify-center rounded-full border text-xs font-semibold ${
+                      processingPhase === 'fetching'
+                        ? 'border-primary bg-primary text-primary-foreground animate-pulse'
+                        : 'border-emerald-500 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                    }`}
+                  >
+                    {processingPhase === 'fetching' ? (
+                      <Icons.spinner className='h-4 w-4 animate-spin' />
+                    ) : (
+                      <Icons.check className='h-4 w-4' />
+                    )}
+                  </div>
+                  <div>
+                    <p className='text-xs font-semibold text-foreground'>
+                      1. Fetching source posting
+                    </p>
+                    <p className='text-[11px] text-muted-foreground'>
+                      Connecting via secure server fetcher and identifying source adapter
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className='text-xs font-semibold text-foreground'>
-                    1. Fetching source posting
-                  </p>
-                  <p className='text-[11px] text-muted-foreground'>
-                    Identifying source adapter and parsing public content
-                  </p>
-                </div>
-              </div>
+              )}
 
               {/* Phase 2: Extracting */}
               <div className='flex items-center gap-3'>
@@ -286,10 +481,12 @@ export function JobImportDialog() {
                 </div>
                 <div>
                   <p className='text-xs font-semibold text-foreground'>
-                    2. Extracting structured metadata
+                    {inputMode === 'url'
+                      ? '2. Extracting structured metadata'
+                      : '1. Parsing job description'}
                   </p>
                   <p className='text-[11px] text-muted-foreground'>
-                    Extracting requirements, responsibilities, salary, and work arrangement
+                    Extracting requirements, responsibilities, skills, and quality evaluation
                   </p>
                 </div>
               </div>
@@ -311,10 +508,12 @@ export function JobImportDialog() {
                 </div>
                 <div>
                   <p className='text-xs font-semibold text-foreground'>
-                    3. Normalizing domain contract
+                    {inputMode === 'url'
+                      ? '3. Normalizing domain contract'
+                      : '2. Normalizing domain contract'}
                   </p>
                   <p className='text-[11px] text-muted-foreground'>
-                    Checking duplicates and evaluating candidate profile fit
+                    Deduplication check and candidate profile fit evaluation
                   </p>
                 </div>
               </div>
@@ -365,8 +564,8 @@ export function JobImportDialog() {
                 <span>Standardized into Normalized Domain Contract</span>
               </div>
               <p className='text-xs text-emerald-800/80 dark:text-emerald-300/80 pl-6'>
-                Identified through <span className='font-medium'>{adapterName}</span> adapter
-                without fake data generation.
+                Identified through <span className='font-medium'>{adapterName}</span> without fake
+                data generation.
               </p>
             </div>
 
@@ -378,11 +577,16 @@ export function JobImportDialog() {
                     {importedJob.company} • {importedJob.location}
                   </p>
                 </div>
-                {importedMatch && (
-                  <Badge variant='secondary' className='font-semibold'>
-                    {importedMatch.score}% Fit
-                  </Badge>
-                )}
+                {importedMatch &&
+                  (importedMatch.recommendation === 'unavailable' ? (
+                    <Badge variant='outline' className='font-medium text-muted-foreground'>
+                      Match Unavailable
+                    </Badge>
+                  ) : (
+                    <Badge variant='secondary' className='font-semibold'>
+                      {importedMatch.score}% Fit
+                    </Badge>
+                  ))}
               </div>
 
               <div className='flex flex-wrap gap-2 text-muted-foreground pt-1'>
@@ -411,22 +615,30 @@ export function JobImportDialog() {
         <DialogFooter className='flex-col sm:flex-row gap-2 sm:justify-end'>
           {step === 'input' && (
             <>
-              <Button variant='ghost' onClick={() => setOpen(false)} disabled={mutation.isPending}>
+              <Button variant='ghost' onClick={() => setOpen(false)} disabled={isPending}>
                 Cancel
               </Button>
-              <Button
-                onClick={() => executeImport(false)}
-                disabled={!url.trim() || mutation.isPending}
-              >
-                Import Job
-              </Button>
+              {inputMode === 'url' ? (
+                <Button onClick={() => executeImport(false)} disabled={!url.trim() || isPending}>
+                  {isPending && <Icons.spinner className='mr-2 h-4 w-4 animate-spin' />}
+                  Import Job
+                </Button>
+              ) : (
+                <Button
+                  onClick={() => executeImport(false)}
+                  disabled={pastedText.trim().length < 20 || isPending}
+                >
+                  {isPending && <Icons.spinner className='mr-2 h-4 w-4 animate-spin' />}
+                  Parse Job Description
+                </Button>
+              )}
             </>
           )}
 
           {step === 'duplicate' && (
             <>
               <Button variant='outline' size='sm' onClick={() => setStep('input')}>
-                Use Another URL
+                {inputMode === 'url' ? 'Use Another URL' : 'Edit Pasted Text'}
               </Button>
               <Button variant='ghost' size='sm' onClick={() => executeImport(true)}>
                 Import Anyway

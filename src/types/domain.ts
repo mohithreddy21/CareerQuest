@@ -12,7 +12,7 @@
 
 export type WorkArrangement = 'remote' | 'hybrid' | 'onsite' | 'unknown';
 
-export type JobStatus = 'active' | 'archived' | 'duplicate';
+export type JobStatus = 'active' | 'closed' | 'archived' | 'duplicate';
 
 export type SourceStatus = 'active' | 'closed' | 'unknown';
 export type VerificationStatus = 'verified_accessible' | 'verification_failed' | 'unverified';
@@ -65,11 +65,55 @@ export interface SavedSearch {
   currency?: string | null;
   alertFrequency: 'instant' | 'daily' | 'weekly' | 'never' | string;
   filterVersion: string;
+  isEnabled?: boolean;
+  minMatchScore?: number | null;
   lastExecutedAt?: Date | string | null;
-  lastMatchCount: number;
+  lastMatchCount?: number;
   createdAt: Date | string;
   updatedAt: Date | string;
 }
+
+export interface SavedSearchAlert {
+  id: string;
+  candidateId: string;
+  savedSearchId: string;
+  jobId: string;
+  savedSearchVersion: string;
+  generatedAt: Date | string;
+  deliveredAt?: Date | string | null;
+  status: 'generated' | 'delivered' | 'dismissed' | string;
+}
+
+export interface CandidateNotification {
+  id: string;
+  candidateId: string;
+  type: 'SAVED_SEARCH_ALERT' | 'NEW_MATCHING_JOB' | string;
+  title: string;
+  message: string;
+  relatedJobId?: string | null;
+  relatedSavedSearchId?: string | null;
+  readAt?: Date | string | null;
+  createdAt: Date | string;
+}
+
+export interface SavedSearchExecutionResult {
+  savedSearchId: string;
+  candidateId: string;
+  executedAt: string;
+  totalMatching: number;
+  newAlertCount: number;
+  matchingJobs: Job[];
+  alerts?: SavedSearchAlert[];
+  notifications?: CandidateNotification[];
+  savedSearch?: SavedSearch;
+  evaluatedAt?: string;
+  totalMatchCount?: number;
+  newMatchCount?: number;
+  opportunities?: import('@/features/jobs/lib/ranking/types').RankedOpportunity[];
+  newOpportunities?: import('@/features/jobs/lib/ranking/types').RankedOpportunity[];
+}
+
+export type SavedSearchOpportunity = import('@/features/jobs/lib/ranking/types').RankedOpportunity;
 
 export interface ExtractedRequirement {
   id: string;
@@ -106,6 +150,8 @@ export interface Job {
   importedByCandidateId?: string;
   sourceReferences?: JobSourceReference[];
   candidateState?: CandidateJobState | null;
+  extractionQuality?: 'reliable' | 'partial' | 'insufficient';
+  extractionQualityReasons?: string[];
 }
 
 export type AnalysisStatus = 'idle' | 'processing' | 'success' | 'error';
@@ -141,13 +187,15 @@ export interface JobMatch {
   jobId: string; // Foreign key -> Job.id
   candidateId: string; // Foreign key -> CandidateProfile.id
   score: number; // 0-100
-  recommendation: 'strong' | 'good' | 'moderate' | 'low';
+  recommendation: 'strong' | 'good' | 'moderate' | 'low' | 'unavailable';
   headline: string;
   reasoning: string;
   strongMatches: MatchPoint[];
   partialMatches: MatchPoint[];
   missingRequirements: MatchPoint[];
   supportingCandidateEvidence: CandidateEvidencePoint[];
+  matchUnavailable?: boolean;
+  unavailableReason?: string;
 }
 
 export interface CandidateExperience {

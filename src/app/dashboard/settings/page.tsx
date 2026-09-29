@@ -6,6 +6,7 @@ import SettingsPage from '@/features/settings/components/settings-page';
 import { dehydrate, HydrationBoundary } from '@tanstack/react-query';
 import { Suspense } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { requireCandidateId } from '@/lib/auth';
 
 export const metadata = {
   title: 'Settings | CareerQuest'
@@ -25,8 +26,9 @@ function SettingsSkeleton() {
 }
 
 export default async function Page() {
+  const candidateId = await requireCandidateId({ redirectOnUnauthenticated: false });
   const queryClient = getQueryClient();
-  void queryClient.prefetchQuery(userSettingsQueryOptions());
+  void queryClient.prefetchQuery(userSettingsQueryOptions(candidateId));
   void queryClient.prefetchQuery(documentsQueryOptions());
 
   return (
@@ -36,7 +38,7 @@ export default async function Page() {
     >
       <HydrationBoundary state={dehydrate(queryClient)}>
         <Suspense fallback={<SettingsSkeleton />}>
-          <SettingsPage />
+          <SettingsPage candidateId={candidateId} />
         </Suspense>
       </HydrationBoundary>
     </PageContainer>

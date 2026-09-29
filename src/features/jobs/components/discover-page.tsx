@@ -1,25 +1,42 @@
 'use client';
 
+import React, { useState } from 'react';
 import { useQueryState, parseAsString, parseAsInteger } from 'nuqs';
-import { useSuspenseQuery } from '@tanstack/react-query';
-import { jobsQueryOptions } from '../api/queries';
+import { useSuspenseQuery, useQueryClient } from '@tanstack/react-query';
+import { discoveryKeys, discoveryRankingQueryOptions } from '../api/queries';
+import {
+  setCandidateJobStateAction,
+  undoCandidateJobStateAction,
+  getDiscoveryRankingAction
+} from '../api/actions';
+import { JobOpportunityCard } from './job-opportunity-card';
 import { JobImportDialog } from './job-import-dialog';
-import { Card, CardContent } from '@/components/ui/card';
+import { SavedSearchesDialog } from './saved-searches-dialog';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select';
 import { Icons } from '@/components/icons';
-import { cn } from '@/lib/utils';
-import Link from 'next/link';
+import { toast } from 'sonner';
+import { RankedOpportunity, DiscoveryRankingParams } from '../lib/ranking';
+import { CandidateJobStatus } from '@/types/domain';
 
 const SOURCE_OPTIONS = [
   { value: 'all', label: 'All Sources' },
   { value: 'greenhouse', label: 'Greenhouse' },
   { value: 'lever', label: 'Lever' },
+  { value: 'company_portal', label: 'Company Careers' },
   { value: 'linkedin', label: 'LinkedIn' },
   { value: 'indeed', label: 'Indeed' },
-  { value: 'workday', label: 'Workday' },
-  { value: 'url_import', label: 'URL Import' }
+  { value: 'url_import', label: 'URL Import' },
+  { value: 'manual', label: 'Manual Import' }
 ];
 
 const WORK_OPTIONS = [
@@ -29,21 +46,35 @@ const WORK_OPTIONS = [
   { value: 'onsite', label: 'Onsite' }
 ];
 
-const SORT_OPTIONS = [
-  { value: 'match_desc', label: 'Highest Fit Score' },
-  { value: 'recent', label: 'Most Recently Added' },
-  { value: 'company_asc', label: 'Company (A to Z)' },
-  { value: 'salary_desc', label: 'Highest Compensation' }
+const MIN_MATCH_OPTIONS = [
+  { value: 0, label: 'Min Alignment: Any' },
+  { value: 90, label: '90%+ Profile Alignment' },
+  { value: 80, label: '80%+ Profile Alignment' },
+  { value: 70, label: '70%+ Profile Alignment' }
 ];
 
-const MIN_MATCH_OPTIONS = [
-  { value: 0, label: 'Any Match' },
-  { value: 90, label: '90%+ Fit' },
-  { value: 80, label: '80%+ Fit' },
-  { value: 70, label: '70%+ Fit' }
+const SORT_OPTIONS = [
+  { value: 'priority', label: 'Opportunity Priority' },
+  { value: 'match_desc', label: 'Profile Alignment (High to Low)' },
+  { value: 'recent', label: 'Most Recently Posted' }
+];
+
+const STATE_FILTER_OPTIONS = [
+  { value: 'all', label: 'All States' },
+  { value: 'unseen', label: 'New / Unseen' },
+  { value: 'viewed', label: 'Viewed' },
+  { value: 'saved', label: 'Saved' },
+  { value: 'dismissed', label: 'Dismissed' }
 ];
 
 export default function DiscoverPage() {
+  const queryClient = useQueryClient();
+
+  // 1. URL State via Nuqs
+  const [tab, setTab] = useQueryState(
+    'tab',
+    parseAsString.withDefault('recommended').withOptions({ shallow: true })
+  );
   const [search, setSearch] = useQueryState(
     'search',
     parseAsString.withDefault('').withOptions({ shallow: true })
@@ -56,35 +87,180 @@ export default function DiscoverPage() {
     'workArrangement',
     parseAsString.withDefault('all').withOptions({ shallow: true })
   );
-  const [sort, setSort] = useQueryState(
-    'sort',
-    parseAsString.withDefault('match_desc').withOptions({ shallow: true })
-  );
   const [minMatch, setMinMatch] = useQueryState(
     'minMatch',
     parseAsInteger.withDefault(0).withOptions({ shallow: true })
   );
-
-  const { data } = useSuspenseQuery(
-    jobsQueryOptions({
-      search: search || undefined,
-      source: source !== 'all' ? source : undefined,
-      workArrangement: workArrangement !== 'all' ? workArrangement : undefined,
-      sort: sort || undefined,
-      minMatch: minMatch > 0 ? minMatch : undefined
-    })
+  const [sort, setSort] = useQueryState(
+    'sort',
+    parseAsString.withDefault('priority').withOptions({ shallow: true })
+  );
+  const [stateFilter, setStateFilter] = useQueryState(
+    'stateFilter',
+    parseAsString.withDefault('all').withOptions({ shallow: true })
   );
 
+  // Discovery Params Contract
+  const activeParams: DiscoveryRankingParams = {
+    tab: (tab as 'recommended' | 'saved' | 'all') || 'recommended',
+    search: search.trim() || undefined,
+    source: source !== 'all' ? source : undefined,
+    workArrangement:
+      workArrangement !== 'all' ? (workArrangement as 'remote' | 'hybrid' | 'onsite') : undefined,
+    minMatch: minMatch > 0 ? minMatch : undefined,
+    sort:
+      tab === 'recommended'
+        ? 'priority'
+        : (sort as 'priority' | 'match_desc' | 'recent') || 'priority',
+    stateFilter:
+      stateFilter !== 'all'
+        ? (stateFilter as 'all' | 'saved' | 'unseen' | 'viewed' | 'dismissed')
+        : undefined
+  };
+
+  // 2. Fetch Initial Page via TanStack React Query + Suspense
+  const { data } = useSuspenseQuery(discoveryRankingQueryOptions(activeParams));
+
+  // 3. Keyset Pagination & Load More State
+  const [extraItems, setExtraItems] = useState<RankedOpportunity[]>([]);
+  const [prevContextKey, setPrevContextKey] = useState(data.rankingContextKey);
+  const [nextCursorOverride, setNextCursorOverride] = useState<string | null | undefined>(
+    undefined
+  );
+  const [hasMoreOverride, setHasMoreOverride] = useState<boolean | undefined>(undefined);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [pendingJobActionId, setPendingJobActionId] = useState<string | null>(null);
+
+  // If rankingContextKey changed (due to filters, tab, or query), reset pagination state during render
+  if (data.rankingContextKey !== prevContextKey) {
+    setPrevContextKey(data.rankingContextKey);
+    setExtraItems([]);
+    setNextCursorOverride(undefined);
+    setHasMoreOverride(undefined);
+  }
+
+  const activeNextCursor = nextCursorOverride !== undefined ? nextCursorOverride : data.nextCursor;
+  const activeHasMore = hasMoreOverride !== undefined ? hasMoreOverride : data.hasMore;
+
+  // Combined Items: Deduplicated by Job ID to prevent duplicate keys across pages
+  const combinedItems: RankedOpportunity[] = React.useMemo(() => {
+    const seen = new Set<string>();
+    const result: RankedOpportunity[] = [];
+    for (const item of [...data.items, ...extraItems]) {
+      if (!seen.has(item.job.id)) {
+        seen.add(item.job.id);
+        result.push(item);
+      }
+    }
+    return result;
+  }, [data.items, extraItems]);
+
+  // Load More Handler (Server-side Keyset Pagination)
+  const handleLoadMore = async () => {
+    if (!activeNextCursor || isLoadingMore) return;
+    setIsLoadingMore(true);
+    try {
+      const response = await getDiscoveryRankingAction({
+        ...activeParams,
+        cursor: activeNextCursor
+      });
+      setExtraItems((prev) => {
+        const seen = new Set(prev.map((i) => i.job.id));
+        for (const item of data.items) seen.add(item.job.id);
+        const newUniques = response.items.filter((i) => !seen.has(i.job.id));
+        return [...prev, ...newUniques];
+      });
+      setNextCursorOverride(response.nextCursor);
+      setHasMoreOverride(response.hasMore);
+    } catch {
+      toast.error('Could not load more opportunities. Please try again.');
+    } finally {
+      setIsLoadingMore(false);
+    }
+  };
+
+  // 4. Save & Dismiss Action Handlers with Deterministic Safe Undo
+  const handleSave = async (jobId: string, currentStatus: CandidateJobStatus | null) => {
+    const isSaved = currentStatus === 'SAVED';
+    const targetStatus: CandidateJobStatus = isSaved ? 'UNSEEN' : 'SAVED';
+    setPendingJobActionId(jobId);
+
+    try {
+      await setCandidateJobStateAction({ jobId, status: targetStatus });
+      await queryClient.invalidateQueries({ queryKey: discoveryKeys.all });
+
+      toast.success(isSaved ? 'Removed from Saved' : 'Opportunity Saved', {
+        action: {
+          label: 'Undo',
+          onClick: async () => {
+            try {
+              await undoCandidateJobStateAction({
+                jobId,
+                targetPreviousState: currentStatus || 'UNSEEN'
+              });
+              await queryClient.invalidateQueries({ queryKey: discoveryKeys.all });
+              toast.info('Undo successful');
+            } catch {
+              toast.error('Failed to undo state change');
+            }
+          }
+        }
+      });
+    } catch {
+      toast.error('Failed to update job status');
+    } finally {
+      setPendingJobActionId(null);
+    }
+  };
+
+  const handleDismiss = async (jobId: string, currentStatus: CandidateJobStatus | null) => {
+    setPendingJobActionId(jobId);
+    const prevStatus: CandidateJobStatus = currentStatus || 'UNSEEN';
+
+    try {
+      await setCandidateJobStateAction({ jobId, status: 'DISMISSED' });
+      await queryClient.invalidateQueries({ queryKey: discoveryKeys.all });
+
+      toast('Opportunity dismissed', {
+        action: {
+          label: 'Undo',
+          onClick: async () => {
+            try {
+              await undoCandidateJobStateAction({
+                jobId,
+                targetPreviousState: prevStatus
+              });
+              await queryClient.invalidateQueries({ queryKey: discoveryKeys.all });
+              toast.success('Opportunity restored');
+            } catch {
+              toast.error('Failed to undo dismissal');
+            }
+          }
+        }
+      });
+    } catch {
+      toast.error('Failed to dismiss opportunity');
+    } finally {
+      setPendingJobActionId(null);
+    }
+  };
+
   const hasActiveFilters = Boolean(
-    search || source !== 'all' || workArrangement !== 'all' || sort !== 'match_desc' || minMatch > 0
+    search.trim() ||
+    source !== 'all' ||
+    workArrangement !== 'all' ||
+    minMatch > 0 ||
+    (tab !== 'recommended' && sort !== 'priority') ||
+    stateFilter !== 'all'
   );
 
   const clearAllFilters = () => {
     setSearch('');
     setSource('all');
     setWorkArrangement('all');
-    setSort('match_desc');
     setMinMatch(0);
+    setSort('priority');
+    setStateFilter('all');
   };
 
   return (
@@ -92,372 +268,292 @@ export default function DiscoverPage() {
       {/* Top Header Controls */}
       <div className='flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b pb-5'>
         <div className='space-y-1'>
-          <div className='flex items-center gap-2'>
+          <div className='flex items-center gap-2.5'>
             <h1 className='text-2xl font-bold tracking-tight text-foreground'>
               Discover Opportunities
             </h1>
-            <Badge variant='outline' className='text-xs font-semibold px-2 py-0.5'>
-              {data.total_items} {data.total_items === 1 ? 'Job' : 'Jobs'}
+            <Badge variant='outline' className='text-xs font-semibold px-2.5 py-0.5'>
+              {data.totalEligible} {data.totalEligible === 1 ? 'Job' : 'Jobs'}
             </Badge>
           </div>
           <p className='text-sm text-muted-foreground'>
-            Normalized opportunities with truthful profile fit analysis. Import custom URLs from any
-            source.
+            Ranked opportunities with profile alignment and factual decision support.
           </p>
         </div>
-        <div className='flex items-center gap-2.5'>
+
+        {/* Action Buttons: Saved Searches & Import */}
+        <div className='flex items-center gap-2 flex-wrap sm:flex-nowrap'>
+          {/* Save Search Button (prepopulating active discovery filters) */}
+          <SavedSearchesDialog
+            initialFilterPrefill={{
+              query: search.trim() || undefined,
+              workArrangements: workArrangement !== 'all' ? [workArrangement] : [],
+              minMatchScore: minMatch > 0 ? minMatch : undefined
+            }}
+            triggerLabel='Save Search'
+            triggerVariant='outline'
+            defaultMode='create'
+          />
+
+          {/* Manage Saved Searches */}
+          <SavedSearchesDialog
+            triggerLabel='Saved Searches'
+            triggerVariant='ghost'
+            defaultMode='list'
+          />
+
+          {/* Import Job */}
           <JobImportDialog />
         </div>
       </div>
 
-      {/* Filter and Search Bar */}
-      <div className='space-y-3.5 bg-card/60 p-4 rounded-xl border shadow-xs'>
-        <div className='flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between'>
-          {/* Search Input */}
-          <div className='relative w-full lg:max-w-md'>
-            <Icons.search className='text-muted-foreground absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2' />
-            <Input
-              id='discover-search-input'
-              placeholder='Search by role, company, location, or skills (e.g. React)...'
-              className='pl-9 bg-background'
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-            {search && (
-              <button
-                type='button'
-                onClick={() => setSearch('')}
-                className='absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground text-xs p-1'
-                aria-label='Clear search'
-              >
-                <Icons.close className='h-3.5 w-3.5' />
-              </button>
-            )}
-          </div>
+      {/* Primary Discovery Tabs: Recommended, Saved, All Jobs */}
+      <Tabs value={tab} onValueChange={(val) => setTab(val)} className='w-full'>
+        <div className='flex flex-col sm:flex-row sm:items-center justify-between gap-4'>
+          <TabsList className='grid grid-cols-3 max-w-md w-full'>
+            <TabsTrigger value='recommended' className='text-xs sm:text-sm'>
+              Recommended
+            </TabsTrigger>
+            <TabsTrigger value='saved' className='text-xs sm:text-sm'>
+              Saved
+            </TabsTrigger>
+            <TabsTrigger value='all' className='text-xs sm:text-sm'>
+              All Jobs
+            </TabsTrigger>
+          </TabsList>
 
-          {/* Sort & Min Match Selector */}
-          <div className='flex flex-wrap items-center gap-2.5'>
-            {/* Sort Dropdown */}
-            <div className='flex items-center gap-1.5 text-xs text-muted-foreground'>
-              <span className='font-medium'>Sort:</span>
-              <select
-                id='discover-sort-select'
-                value={sort}
-                onChange={(e) => setSort(e.target.value)}
-                className='h-8 rounded-md border border-input bg-background px-2.5 py-1 text-xs font-medium text-foreground shadow-xs focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring'
-              >
-                {SORT_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Min Match Dropdown */}
-            <div className='flex items-center gap-1.5 text-xs text-muted-foreground'>
-              <span className='font-medium'>Min Fit:</span>
-              <select
-                id='discover-match-select'
-                value={minMatch}
-                onChange={(e) => setMinMatch(Number(e.target.value))}
-                className='h-8 rounded-md border border-input bg-background px-2.5 py-1 text-xs font-medium text-foreground shadow-xs focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring'
-              >
-                {MIN_MATCH_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </div>
-
-        {/* Source & Work Arrangement Filter Pills */}
-        <div className='flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-border/60'>
-          {/* Source filters */}
-          <div className='flex flex-wrap items-center gap-1.5'>
-            <span className='text-xs font-medium text-muted-foreground mr-1'>Source:</span>
-            {SOURCE_OPTIONS.map((opt) => {
-              const isActive = source === opt.value;
-              return (
-                <button
-                  key={opt.value}
-                  type='button'
-                  onClick={() => setSource(opt.value)}
-                  className={`rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
-                    isActive
-                      ? 'bg-primary text-primary-foreground shadow-xs'
-                      : 'bg-muted/70 text-muted-foreground hover:bg-muted hover:text-foreground'
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Work Arrangement filters */}
-          <div className='flex flex-wrap items-center gap-1.5'>
-            <span className='text-xs font-medium text-muted-foreground mr-1'>Arrangement:</span>
-            {WORK_OPTIONS.map((opt) => {
-              const isActive = workArrangement === opt.value;
-              return (
-                <button
-                  key={opt.value}
-                  type='button'
-                  onClick={() => setWorkArrangement(opt.value)}
-                  className={`rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
-                    isActive
-                      ? 'bg-primary text-primary-foreground shadow-xs'
-                      : 'bg-muted/70 text-muted-foreground hover:bg-muted hover:text-foreground'
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Active Filter Chips & Clear Action */}
-        {hasActiveFilters && (
-          <div className='flex flex-wrap items-center gap-2 pt-2 text-xs text-muted-foreground border-t border-border/40'>
-            <span className='font-medium'>Active filters:</span>
-            {search && (
-              <Badge variant='secondary' className='gap-1 font-normal text-[11px]'>
-                Search: &ldquo;{search}&rdquo;
-                <Icons.close
-                  className='h-3 w-3 cursor-pointer hover:text-foreground'
-                  onClick={() => setSearch('')}
-                />
-              </Badge>
-            )}
-            {source !== 'all' && (
-              <Badge variant='secondary' className='gap-1 font-normal text-[11px] capitalize'>
-                Source: {source.replace('_', ' ')}
-                <Icons.close
-                  className='h-3 w-3 cursor-pointer hover:text-foreground'
-                  onClick={() => setSource('all')}
-                />
-              </Badge>
-            )}
-            {workArrangement !== 'all' && (
-              <Badge variant='secondary' className='gap-1 font-normal text-[11px] capitalize'>
-                Arrangement: {workArrangement}
-                <Icons.close
-                  className='h-3 w-3 cursor-pointer hover:text-foreground'
-                  onClick={() => setWorkArrangement('all')}
-                />
-              </Badge>
-            )}
-            {minMatch > 0 && (
-              <Badge variant='secondary' className='gap-1 font-normal text-[11px]'>
-                Min Fit: {minMatch}%+
-                <Icons.close
-                  className='h-3 w-3 cursor-pointer hover:text-foreground'
-                  onClick={() => setMinMatch(0)}
-                />
-              </Badge>
-            )}
-            {sort !== 'match_desc' && (
-              <Badge variant='secondary' className='gap-1 font-normal text-[11px]'>
-                Sorted by: {SORT_OPTIONS.find((s) => s.value === sort)?.label}
-                <Icons.close
-                  className='h-3 w-3 cursor-pointer hover:text-foreground'
-                  onClick={() => setSort('match_desc')}
-                />
-              </Badge>
-            )}
+          {/* Active Filter Clear if filters are set */}
+          {hasActiveFilters && (
             <Button
               variant='ghost'
               size='sm'
               onClick={clearAllFilters}
-              className='h-6 px-2 text-[11px] text-muted-foreground hover:text-foreground'
+              className='text-xs text-muted-foreground hover:text-foreground h-8 px-2.5'
             >
-              Reset all
+              <Icons.close className='mr-1 h-3.5 w-3.5' />
+              Reset Filters
             </Button>
-          </div>
+          )}
+        </div>
+      </Tabs>
+
+      {/* Search & Filter Controls Bar */}
+      <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 bg-muted/20 p-3.5 rounded-xl border border-border/70'>
+        {/* Search Input */}
+        <div className='relative sm:col-span-2 lg:col-span-1'>
+          <Icons.search className='absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground' />
+          <Input
+            placeholder='Search title, company, skills...'
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className='pl-9 h-9 text-xs'
+          />
+          {search && (
+            <button
+              onClick={() => setSearch('')}
+              className='absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground'
+              aria-label='Clear search'
+            >
+              <Icons.close className='h-3.5 w-3.5' />
+            </button>
+          )}
+        </div>
+
+        {/* Work Arrangement */}
+        <Select value={workArrangement} onValueChange={(val) => setWorkArrangement(val)}>
+          <SelectTrigger className='h-9 text-xs'>
+            <SelectValue placeholder='Arrangement' />
+          </SelectTrigger>
+          <SelectContent>
+            {WORK_OPTIONS.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value} className='text-xs'>
+                {opt.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* Minimum Profile Alignment */}
+        <Select
+          value={String(minMatch)}
+          onValueChange={(val) => setMinMatch(val ? parseInt(val, 10) : 0)}
+        >
+          <SelectTrigger className='h-9 text-xs'>
+            <SelectValue placeholder='Profile Alignment' />
+          </SelectTrigger>
+          <SelectContent>
+            {MIN_MATCH_OPTIONS.map((opt) => (
+              <SelectItem key={opt.value} value={String(opt.value)} className='text-xs'>
+                {opt.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* Source Filter */}
+        <Select value={source} onValueChange={(val) => setSource(val)}>
+          <SelectTrigger className='h-9 text-xs'>
+            <SelectValue placeholder='Source' />
+          </SelectTrigger>
+          <SelectContent>
+            {SOURCE_OPTIONS.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value} className='text-xs'>
+                {opt.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* Extended Controls for All Jobs Tab */}
+        {tab === 'all' && (
+          <>
+            {/* Sort Dropdown */}
+            <Select value={sort} onValueChange={(val) => setSort(val)}>
+              <SelectTrigger className='h-9 text-xs'>
+                <SelectValue placeholder='Sort order' />
+              </SelectTrigger>
+              <SelectContent>
+                {SORT_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value} className='text-xs'>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* State Filter */}
+            <Select value={stateFilter} onValueChange={(val) => setStateFilter(val)}>
+              <SelectTrigger className='h-9 text-xs'>
+                <SelectValue placeholder='Candidate State' />
+              </SelectTrigger>
+              <SelectContent>
+                {STATE_FILTER_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value} className='text-xs'>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </>
         )}
       </div>
 
-      {/* Job Results Feed */}
-      {data.items.length === 0 ? (
-        <Card className='p-10 text-center border-dashed'>
-          <div className='flex flex-col items-center justify-center gap-3 max-w-md mx-auto'>
-            <div className='rounded-full bg-muted p-3'>
-              <Icons.search className='text-muted-foreground h-6 w-6' />
+      {/* Results Section */}
+      {combinedItems.length > 0 ? (
+        <div className='space-y-4'>
+          {/* Card Grid */}
+          <div className='grid grid-cols-1 gap-4'>
+            {combinedItems.map((opp) => (
+              <JobOpportunityCard
+                key={opp.job.id}
+                opportunity={opp}
+                onSave={handleSave}
+                onDismiss={handleDismiss}
+                isSaving={pendingJobActionId === opp.job.id}
+                isDismissing={pendingJobActionId === opp.job.id}
+              />
+            ))}
+          </div>
+
+          {/* Keyset Pagination Load More Controls */}
+          {activeHasMore && (
+            <div className='flex justify-center pt-4 pb-2'>
+              <Button
+                variant='outline'
+                size='default'
+                onClick={handleLoadMore}
+                disabled={isLoadingMore}
+                className='min-h-[44px] px-8 text-xs font-semibold'
+              >
+                {isLoadingMore ? (
+                  <>
+                    <Icons.spinner className='mr-2 h-4 w-4 animate-spin' />
+                    Loading opportunities...
+                  </>
+                ) : (
+                  <>
+                    Load more opportunities
+                    <Icons.chevronDown className='ml-2 h-4 w-4' />
+                  </>
+                )}
+              </Button>
             </div>
-            <div className='space-y-1'>
-              <h3 className='text-base font-semibold text-foreground'>No opportunities found</h3>
-              <p className='text-xs text-muted-foreground'>
-                No job postings match your current search and filter combination. Try clearing your
-                filters or paste a link to import any posting.
+          )}
+
+          {/* End of Results Indicator */}
+          {!activeHasMore && combinedItems.length > 0 && (
+            <div className='py-6 text-center text-xs text-muted-foreground border-t border-border/40'>
+              You have viewed all {combinedItems.length} matching opportunities.
+            </div>
+          )}
+        </div>
+      ) : (
+        /* Meaningful Empty States per Tab */
+        <div className='flex flex-col items-center justify-center py-16 px-4 rounded-xl border border-dashed text-center bg-card/40'>
+          {tab === 'recommended' ? (
+            <>
+              <Icons.sparkles className='h-10 w-10 text-muted-foreground/50 mb-3' />
+              <h3 className='text-base font-semibold text-foreground'>
+                No recommended opportunities yet
+              </h3>
+              <p className='text-xs text-muted-foreground max-w-sm mt-1.5 leading-relaxed'>
+                Try importing a job from a custom URL, expanding your search filters, or updating
+                your role preferences.
               </p>
-            </div>
-            <div className='flex items-center gap-2 pt-2'>
+              <div className='flex items-center gap-2 mt-5'>
+                <JobImportDialog />
+                {hasActiveFilters && (
+                  <Button
+                    variant='outline'
+                    size='sm'
+                    onClick={clearAllFilters}
+                    className='h-9 text-xs'
+                  >
+                    Reset Filters
+                  </Button>
+                )}
+              </div>
+            </>
+          ) : tab === 'saved' ? (
+            <>
+              <Icons.star className='h-10 w-10 text-amber-500/50 mb-3' />
+              <h3 className='text-base font-semibold text-foreground'>
+                You haven&apos;t saved any jobs yet
+              </h3>
+              <p className='text-xs text-muted-foreground max-w-sm mt-1.5 leading-relaxed'>
+                Click &ldquo;Save&rdquo; on any opportunity card to keep track of it here.
+              </p>
+              <Button
+                variant='outline'
+                size='sm'
+                onClick={() => setTab('recommended')}
+                className='mt-5 h-9 text-xs'
+              >
+                Browse Recommended Jobs
+              </Button>
+            </>
+          ) : (
+            <>
+              <Icons.search className='h-10 w-10 text-muted-foreground/50 mb-3' />
+              <h3 className='text-base font-semibold text-foreground'>
+                No jobs match these filters
+              </h3>
+              <p className='text-xs text-muted-foreground max-w-sm mt-1.5 leading-relaxed'>
+                Try adjusting your search query, clearing arrangements, or lowering the minimum
+                alignment threshold.
+              </p>
               {hasActiveFilters && (
-                <Button variant='outline' size='sm' onClick={clearAllFilters}>
-                  Clear all filters
+                <Button
+                  variant='outline'
+                  size='sm'
+                  onClick={clearAllFilters}
+                  className='mt-5 h-9 text-xs'
+                >
+                  Clear All Filters
                 </Button>
               )}
-              <JobImportDialog />
-            </div>
-          </div>
-        </Card>
-      ) : (
-        <div className='grid gap-4'>
-          {data.items.map((job) => {
-            const matchScore = job.match?.score ?? 0;
-            const hasSalary = Boolean(job.salary && (job.salary.min || job.salary.max));
-
-            return (
-              <Card
-                key={job.id}
-                className='transition-all duration-200 hover:border-primary/50 hover:shadow-sm overflow-hidden'
-              >
-                <CardContent className='p-5'>
-                  <div className='flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between'>
-                    {/* Left Column: Job Info */}
-                    <div className='space-y-3 flex-1 min-w-0'>
-                      <div className='space-y-1'>
-                        <div className='flex flex-wrap items-center gap-2'>
-                          <Link
-                            href={`/dashboard/jobs/${job.id}`}
-                            className='text-base font-semibold text-foreground hover:text-primary transition-colors'
-                          >
-                            {job.title}
-                          </Link>
-                          <span className='text-muted-foreground text-xs'>at</span>
-                          <span className='text-sm font-medium text-foreground/90'>
-                            {job.company}
-                          </span>
-
-                          {/* Source Badge */}
-                          <Badge variant='secondary' className='text-[10px] capitalize font-medium'>
-                            {job.source.replace('_', ' ')}
-                          </Badge>
-
-                          {/* Pipeline status if tracked */}
-                          {job.applicationStatus && (
-                            <Badge
-                              variant='outline'
-                              className='text-[10px] uppercase tracking-wider font-semibold border-primary/40 text-primary'
-                            >
-                              Pipeline: {job.applicationStatus}
-                            </Badge>
-                          )}
-                        </div>
-
-                        {/* Location, Arrangement, Compensation, Date */}
-                        <div className='flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground pt-0.5'>
-                          <span className='flex items-center gap-1'>
-                            <Icons.workspace className='h-3.5 w-3.5 shrink-0' />
-                            {job.location} ({job.workArrangement})
-                          </span>
-
-                          {hasSalary ? (
-                            <span className='flex items-center gap-1 font-medium text-foreground/90'>
-                              <Icons.billing className='h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-400' />
-                              ${(job.salary!.min ?? 0) / 1000}k - ${(job.salary!.max ?? 0) / 1000}k
-                            </span>
-                          ) : (
-                            <span className='italic text-muted-foreground/80'>
-                              Compensation not disclosed
-                            </span>
-                          )}
-
-                          {job.postedDate && (
-                            <span className='flex items-center gap-1'>
-                              <Icons.calendar className='h-3.5 w-3.5 shrink-0' />
-                              Posted {job.postedDate}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Brief description excerpt */}
-                      <p className='line-clamp-2 text-xs text-muted-foreground/90 leading-relaxed'>
-                        {job.description}
-                      </p>
-
-                      {/* Required Skills chips */}
-                      <div className='flex flex-wrap items-center gap-1.5 pt-1'>
-                        {job.requiredSkills.slice(0, 5).map((skill) => (
-                          <Badge
-                            key={skill}
-                            variant='outline'
-                            className='text-[11px] font-normal py-0.5'
-                          >
-                            {skill}
-                          </Badge>
-                        ))}
-                        {job.requiredSkills.length > 5 && (
-                          <span className='self-center text-[10px] text-muted-foreground font-medium'>
-                            +{job.requiredSkills.length - 5} more
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Right Column: Profile Fit & Action CTAs */}
-                    <div className='flex sm:flex-col items-end justify-between sm:justify-start gap-3.5 pt-3 sm:pt-0 sm:border-l sm:pl-5 shrink-0 min-w-[140px]'>
-                      {/* Fit Score Badge */}
-                      {job.match ? (
-                        <div className='flex flex-col items-end'>
-                          <div className='flex items-center gap-1.5'>
-                            <span
-                              className={`text-lg font-bold tracking-tight ${
-                                matchScore >= 90
-                                  ? 'text-emerald-600 dark:text-emerald-400'
-                                  : matchScore >= 80
-                                    ? 'text-blue-600 dark:text-blue-400'
-                                    : 'text-amber-600 dark:text-amber-400'
-                              }`}
-                            >
-                              {matchScore}%
-                            </span>
-                            <span className='text-[11px] font-semibold uppercase text-muted-foreground'>
-                              Fit
-                            </span>
-                          </div>
-                          <p className='text-[10px] text-muted-foreground text-right hidden sm:block'>
-                            Profile alignment
-                          </p>
-                        </div>
-                      ) : (
-                        <span className='text-xs text-muted-foreground italic'>No fit score</span>
-                      )}
-
-                      {/* Action CTA */}
-                      <div className='flex flex-col items-end gap-1.5 w-full sm:w-auto'>
-                        <Link
-                          href={`/dashboard/jobs/${job.id}`}
-                          className={cn(
-                            buttonVariants({ size: 'sm' }),
-                            'h-8 px-3.5 shadow-xs w-full sm:w-auto justify-center'
-                          )}
-                        >
-                          Review Match
-                          <Icons.arrowRight className='ml-1.5 h-3.5 w-3.5' />
-                        </Link>
-                        {job.originalUrl && (
-                          <a
-                            href={job.originalUrl}
-                            target='_blank'
-                            rel='noopener noreferrer'
-                            className='text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-1'
-                          >
-                            Source Link <Icons.externalLink className='h-3 w-3' />
-                          </a>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
+            </>
+          )}
         </div>
       )}
     </div>

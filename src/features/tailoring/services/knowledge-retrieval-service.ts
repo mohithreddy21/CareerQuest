@@ -11,9 +11,9 @@ export class KnowledgeRetrievalService {
 
   async retrieveKnowledgeForJob(
     jobId: string,
-    candidateId: string = 'cand-1'
+    candidateId: string
   ): Promise<RetrievedCandidateKnowledge> {
-    const job = await careerRepository.getJobById(jobId);
+    const job = await careerRepository.getJobById(jobId, candidateId);
     if (!job) throw new Error(`Job not found: ${jobId}`);
 
     const analysis = await careerRepository.getJobAnalysis(jobId);

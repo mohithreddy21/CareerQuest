@@ -101,14 +101,18 @@ export class GenericHtmlAdapter implements JobSourceAdapter {
 
     // Determine Location
     let location = 'Unknown';
-    if (
-      jsonLd?.jobLocation &&
-      typeof jsonLd.jobLocation === 'object' &&
-      'address' in jsonLd.jobLocation
-    ) {
-      const addr = jsonLd.jobLocation.address;
+    const locItem = Array.isArray(jsonLd?.jobLocation)
+      ? jsonLd.jobLocation[0]
+      : jsonLd?.jobLocation;
+    if (locItem && typeof locItem === 'object' && 'address' in locItem) {
+      const addr = (locItem as { address?: unknown }).address;
       if (typeof addr === 'object' && addr !== null) {
-        const parts = [addr.addressLocality, addr.addressRegion, addr.addressCountry].filter(
+        const postal = addr as {
+          addressLocality?: string;
+          addressRegion?: string;
+          addressCountry?: string;
+        };
+        const parts = [postal.addressLocality, postal.addressRegion, postal.addressCountry].filter(
           Boolean
         );
         if (parts.length > 0) location = parts.join(', ');
@@ -189,6 +193,18 @@ export class GenericHtmlAdapter implements JobSourceAdapter {
       }
     }
 
+    let sourceJobId: string | null = null;
+    const jsonLdRecord = jsonLd as Record<string, unknown> | undefined;
+    if (
+      jsonLdRecord?.identifier &&
+      typeof jsonLdRecord.identifier === 'object' &&
+      'value' in jsonLdRecord.identifier
+    ) {
+      sourceJobId = String((jsonLdRecord.identifier as { value?: unknown }).value);
+    } else if (typeof jsonLdRecord?.identifier === 'string') {
+      sourceJobId = jsonLdRecord.identifier;
+    }
+
     return {
       title,
       company,
@@ -204,7 +220,7 @@ export class GenericHtmlAdapter implements JobSourceAdapter {
       salaryInterval: salary.interval,
       postedDate,
       source: 'generic',
-      sourceJobId: null,
+      sourceJobId,
       sourceUrl: url
     };
   }

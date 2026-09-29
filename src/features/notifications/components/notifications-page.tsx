@@ -6,7 +6,12 @@ import { Button } from '@/components/ui/button';
 import { NotificationCard } from '@/components/ui/notification-card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useRouter } from 'next/navigation';
-import { useNotificationStore } from '../utils/store';
+import { useEffect } from 'react';
+import { useNotificationStore, type Notification } from '../utils/store';
+import {
+  getNotificationsAction,
+  markNotificationReadAction
+} from '@/features/jobs/api/saved-search-actions';
 
 const actionRoutes: Record<string, string> = {
   'view-job': '/dashboard/discover',
@@ -15,9 +20,49 @@ const actionRoutes: Record<string, string> = {
 };
 
 export default function NotificationsPage() {
-  const { notifications, markAsRead, markAllAsRead, unreadCount } = useNotificationStore();
+  const { notifications, setNotifications, markAsRead, markAllAsRead, unreadCount } =
+    useNotificationStore();
   const router = useRouter();
   const count = unreadCount();
+
+  useEffect(() => {
+    let active = true;
+    getNotificationsAction()
+      .then((dbNotifs) => {
+        if (!active || !Array.isArray(dbNotifs)) return;
+        const mapped: Notification[] = dbNotifs.map((n) => ({
+          id: n.id,
+          title: n.title,
+          body: n.message,
+          status: n.readAt ? 'read' : 'unread',
+          createdAt:
+            typeof n.createdAt === 'string' ? n.createdAt : new Date(n.createdAt).toISOString(),
+          actions: n.relatedJobId
+            ? [
+                {
+                  id: 'view-target',
+                  label: 'View details',
+                  type: 'redirect',
+                  style: 'primary'
+                }
+              ]
+            : undefined
+        }));
+        setNotifications(mapped);
+      })
+      .catch(() => {
+        // graceful fallback if unauthenticated or offline
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [setNotifications]);
+
+  const handleMarkAsRead = (id: string) => {
+    markAsRead(id);
+    markNotificationReadAction(id).catch(() => {});
+  };
 
   const unreadNotifications = notifications.filter((n) => n.status === 'unread');
   const readNotifications = notifications.filter((n) => n.status === 'read');
@@ -42,12 +87,11 @@ export default function NotificationsPage() {
             body={notification.body}
             status={notification.status}
             createdAt={notification.createdAt}
-            actions={notification.actions}
-            onMarkAsRead={markAsRead}
+            onMarkAsRead={handleMarkAsRead}
             onAction={(notifId, actionId) => {
               const route = actionRoutes[actionId];
+              handleMarkAsRead(notifId);
               if (route) {
-                markAsRead(notifId);
                 router.push(route);
               }
             }}

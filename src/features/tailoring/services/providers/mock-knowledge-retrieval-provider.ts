@@ -22,7 +22,7 @@ export class MockKnowledgeRetrievalProvider implements KnowledgeRetrievalProvide
     analysis: JobAnalysis,
     approvedKnowledgeItems: KnowledgeItem[]
   ): Promise<RetrievedCandidateKnowledge> {
-    const candidateId = approvedKnowledgeItems[0]?.candidateId || 'cand-1';
+    const candidateId = approvedKnowledgeItems[0]?.candidateId || '';
     const retrievedItems: RetrievedKnowledgeItem[] = [];
     const matchedSkillNames = new Set<string>();
 

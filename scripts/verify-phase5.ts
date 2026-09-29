@@ -198,8 +198,9 @@ async function runTests() {
   );
 
   // Restore app-1 follow-up to pending due today for UI demo
+  const todayStr = new Date().toISOString().split('T')[0];
   await careerRepository.updateApplicationFollowUp('app-1', {
-    followUpDate: '2026-09-12',
+    followUpDate: todayStr,
     followUpStatus: 'pending',
     followUpNote: 'Scheduled 7-day follow-up after application'
   });
@@ -212,9 +213,10 @@ async function runTests() {
   assert(app5 !== null, 'app-5 exists');
   assert((app5?.interviewStages?.length ?? 0) >= 2, 'app-5 has interview stages recorded');
 
+  const futureInterviewDate = new Date(Date.now() + 3 * 86400000).toISOString();
   const addedStage = await careerRepository.addInterviewStage('app-5', {
     stageName: 'Executive Chat',
-    scheduledDate: '2026-09-18T15:00:00.000Z',
+    scheduledDate: futureInterviewDate,
     interviewerNames: ['Dylan Field (CEO)'],
     notes: 'Discussion around design tool platform vision',
     status: 'scheduled',

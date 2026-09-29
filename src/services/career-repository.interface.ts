@@ -13,6 +13,8 @@ import {
   CandidateJobState,
   CandidateJobStatus,
   SavedSearch,
+  SavedSearchAlert,
+  CandidateNotification,
   NextAction,
   ResumeChange,
   ResumeChangeStatus,
@@ -33,6 +35,7 @@ import {
 } from '@/types';
 import { ApplicationDetail, ApplicationWithJob } from '@/features/applications/api/types';
 import { ImportJobResponse } from '@/features/jobs/api/types';
+import { DiscoveryRankingParams, DiscoveryRankingResponse } from '@/features/jobs/lib/ranking';
 import { DashboardOverviewResponse } from '@/features/overview/api/types';
 import { InsightEngineResult } from '@/features/analytics/services/insight-engine';
 
@@ -118,16 +121,70 @@ export interface ICareerRepository {
     candidateId: string,
     dismissedReason?: string
   ): Promise<CandidateJobState>;
+  undoCandidateJobState(
+    jobId: string,
+    candidateId: string,
+    targetPreviousState?: CandidateJobStatus
+  ): Promise<CandidateJobState | null>;
   getSavedSearches(candidateId: string): Promise<SavedSearch[]>;
   getSavedSearchById(id: string, candidateId: string): Promise<SavedSearch | null>;
   saveSavedSearch(
-    search: Omit<SavedSearch, 'id' | 'createdAt' | 'updatedAt' | 'candidateId'> & {
+    search: Partial<Omit<SavedSearch, 'id' | 'createdAt' | 'updatedAt' | 'candidateId'>> & {
       id?: string;
       candidateId?: string;
+      name?: string;
     },
     candidateId: string
   ): Promise<SavedSearch>;
+  enableSavedSearch(id: string, candidateId: string): Promise<SavedSearch>;
+  disableSavedSearch(id: string, candidateId: string): Promise<SavedSearch>;
   deleteSavedSearch(id: string, candidateId: string): Promise<boolean>;
+  getEnabledSavedSearches(frequency?: string, candidateId?: string): Promise<SavedSearch[]>;
+
+  // --- Phase 7E: Alerts & In-App Notifications ---
+  getSavedSearchAlerts(candidateId: string, savedSearchId?: string): Promise<SavedSearchAlert[]>;
+  createSavedSearchAlertAndNotification(params: {
+    candidateId: string;
+    savedSearchId: string;
+    jobId: string;
+    savedSearchVersion: string;
+    notificationTitle: string;
+    notificationMessage: string;
+    generatedAt?: Date;
+  }): Promise<{
+    alert: SavedSearchAlert | null;
+    notification: CandidateNotification | null;
+    isNew: boolean;
+  }>;
+  getNotifications(candidateId: string): Promise<CandidateNotification[]>;
+  markNotificationAsRead(id: string, candidateId: string): Promise<boolean>;
+
+  // --- Phase 7C: Deduplication & Source Intelligence ---
+  findDuplicateCandidates(company: string, title?: string, candidateId?: string): Promise<Job[]>;
+  updateJobDuplicateGroup(jobId: string, duplicateGroupId: string): Promise<void>;
+  updateJobStatus(jobId: string, jobStatus: string): Promise<void>;
+  updateJobSourceReference(
+    id: string,
+    updates: Partial<
+      Pick<
+        JobSourceReference,
+        | 'sourceStatus'
+        | 'verificationStatus'
+        | 'lastVerifiedAt'
+        | 'lastVerificationError'
+        | 'isPrimary'
+        | 'referenceRole'
+        | 'lastSeenAt'
+      >
+    >
+  ): Promise<JobSourceReference>;
+  fallbackPrimarySource(jobId: string): Promise<JobSourceReference | null>;
+
+  // --- Phase 7D: Opportunity Priority & Discovery Ranking ---
+  getDiscoveryRanking(
+    params: DiscoveryRankingParams,
+    candidateId: string
+  ): Promise<DiscoveryRankingResponse>;
 
   // --- Candidate Knowledge Bank & Provenance ---
   getKnowledgeBank(candidateId?: string): Promise<CandidateKnowledgeBank>;

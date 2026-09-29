@@ -12,12 +12,18 @@ import { Icons } from '@/components/icons';
 import { toast } from 'sonner';
 import { DocumentsManagementCard } from './documents-management-card';
 
-export default function SettingsPage() {
-  const { data: settings } = useSuspenseQuery(userSettingsQueryOptions());
+interface SettingsPageProps {
+  candidateId?: string;
+}
 
-  const [targetRoles, setTargetRoles] = useState(settings.targetRoles.join(', '));
-  const [locations, setLocations] = useState(settings.preferredLocations.join(', '));
-  const [salaryMin, setSalaryMin] = useState(String(settings.targetSalaryMin));
+export default function SettingsPage({ candidateId }: SettingsPageProps = {}) {
+  const { data: settings } = useSuspenseQuery(userSettingsQueryOptions(candidateId));
+
+  const [targetRoles, setTargetRoles] = useState(settings.targetRoles?.join(', ') || '');
+  const [locations, setLocations] = useState(settings.preferredLocations?.join(', ') || '');
+  const [salaryMin, setSalaryMin] = useState(
+    settings.targetSalaryMin ? String(settings.targetSalaryMin) : ''
+  );
   const [privateMode, setPrivateMode] = useState(settings.privateMode);
   const [notifyOnHighMatch, setNotifyOnHighMatch] = useState(settings.notifyOnHighMatch);
   const [autoExtract, setAutoExtract] = useState(settings.autoExtractRequirements);
@@ -44,7 +50,7 @@ export default function SettingsPage() {
           .split(',')
           .map((l) => l.trim())
           .filter(Boolean),
-        targetSalaryMin: Number(salaryMin) || 160000,
+        targetSalaryMin: salaryMin.trim() ? Number(salaryMin) : undefined,
         privateMode,
         notifyOnHighMatch,
         autoExtractRequirements: autoExtract

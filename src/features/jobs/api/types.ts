@@ -54,10 +54,15 @@ export interface ImportJobPayload {
 export interface ImportJobResponse {
   success: boolean;
   isDuplicate?: boolean;
+  duplicateTier?: 'exact_match' | 'strong_duplicate' | 'possible_duplicate' | 'unique';
+  duplicateGroupId?: string;
   existingJob?: Job;
   job?: Job;
   analysis?: JobAnalysis;
   match?: JobMatch;
+  sourceReference?: JobSourceReference;
   adapterName?: string;
   error?: string;
+  evidence?: unknown;
+  possibleDuplicates?: Array<{ job: Job; evidence: unknown }>;
 }

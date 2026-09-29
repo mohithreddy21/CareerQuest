@@ -1,12 +1,24 @@
 import { mutationOptions } from '@tanstack/react-query';
 import { getQueryClient } from '@/lib/query-client';
-import { importJobByUrlAction, runJobAnalysisAction } from './actions';
+import { importJobByUrlAction, importJobFromTextAction, runJobAnalysisAction } from './actions';
 import { ImportJobPayload, ImportJobResponse } from './types';
+import { ImportJobFromTextPayload } from './schemas';
 import { jobKeys } from './queries';
 import { JobAnalysis, JobMatch } from '@/types/domain';
 
 export const importJobMutation = mutationOptions<ImportJobResponse, Error, ImportJobPayload>({
   mutationFn: (payload: ImportJobPayload) => importJobByUrlAction(payload),
+  onSuccess: () => {
+    getQueryClient().invalidateQueries({ queryKey: jobKeys.all });
+  }
+});
+
+export const importJobFromTextMutation = mutationOptions<
+  ImportJobResponse,
+  Error,
+  ImportJobFromTextPayload
+>({
+  mutationFn: (payload: ImportJobFromTextPayload) => importJobFromTextAction(payload),
   onSuccess: () => {
     getQueryClient().invalidateQueries({ queryKey: jobKeys.all });
   }

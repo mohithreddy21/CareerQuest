@@ -29,7 +29,7 @@ export interface KnowledgeBankWorkspaceProps {
   candidateId?: string;
 }
 
-export function KnowledgeBankWorkspace({ candidateId = 'cand-1' }: KnowledgeBankWorkspaceProps) {
+export function KnowledgeBankWorkspace({ candidateId }: KnowledgeBankWorkspaceProps) {
   const queryClient = useQueryClient();
 
   const { data: bank } = useSuspenseQuery(knowledgeBankQueryOptions(candidateId));

@@ -111,7 +111,13 @@ export async function requireCandidate(options?: {
     } as AuthenticatedCandidate;
   }
 
-  const { userId } = await auth();
+  let userId: string | null = null;
+  try {
+    const authResult = await auth();
+    userId = authResult?.userId ?? null;
+  } catch {
+    userId = null;
+  }
 
   if (!userId) {
     if (options?.redirectOnUnauthenticated ?? true) {
@@ -156,8 +162,17 @@ export async function getCandidate(): Promise<AuthenticatedCandidate | null> {
       });
     }
 
-    const { userId } = await auth();
-    if (!userId) return null;
+    let userId: string | null = null;
+    try {
+      const authResult = await auth();
+      userId = authResult?.userId ?? null;
+    } catch {
+      userId = null;
+    }
+
+    if (!userId) {
+      return null;
+    }
 
     const candidate = await prisma.candidate.findUnique({
       where: { clerkUserId: userId },

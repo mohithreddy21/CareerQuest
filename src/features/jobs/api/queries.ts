@@ -33,3 +33,79 @@ export const jobMatchOptions = (jobId: string) =>
     queryKey: jobKeys.match(jobId),
     queryFn: () => getJobMatch(jobId)
   });
+
+export const savedSearchKeys = {
+  all: ['saved-searches'] as const,
+  list: () => [...savedSearchKeys.all, 'list'] as const,
+  detail: (id: string) => [...savedSearchKeys.all, 'detail', id] as const,
+  execution: (id: string) => [...savedSearchKeys.all, 'execution', id] as const
+};
+
+export const notificationKeys = {
+  all: ['notifications'] as const,
+  list: () => [...notificationKeys.all, 'list'] as const
+};
+
+export const savedSearchesQueryOptions = () =>
+  queryOptions({
+    queryKey: savedSearchKeys.list(),
+    queryFn: async () => {
+      const { getSavedSearchesAction } = await import('./saved-search-actions');
+      return getSavedSearchesAction();
+    }
+  });
+
+export const notificationsQueryOptions = () =>
+  queryOptions({
+    queryKey: notificationKeys.list(),
+    queryFn: async () => {
+      const { getNotificationsAction } = await import('./saved-search-actions');
+      return getNotificationsAction();
+    }
+  });
+
+export const discoveryKeys = {
+  all: ['discovery'] as const,
+  ranking: (params: import('../lib/ranking').DiscoveryRankingParams) =>
+    [...discoveryKeys.all, 'ranking', params] as const,
+  sources: (jobId: string) => [...discoveryKeys.all, 'sources', jobId] as const,
+  state: (jobId: string) => [...discoveryKeys.all, 'state', jobId] as const
+};
+
+export const discoveryRankingQueryOptions = (
+  params: import('../lib/ranking').DiscoveryRankingParams
+) =>
+  queryOptions({
+    queryKey: discoveryKeys.ranking(params),
+    queryFn: async () => {
+      const { getDiscoveryRankingAction } = await import('./actions');
+      return getDiscoveryRankingAction(params);
+    }
+  });
+
+export const jobSourceReferencesQueryOptions = (jobId: string) =>
+  queryOptions({
+    queryKey: discoveryKeys.sources(jobId),
+    queryFn: async () => {
+      const { getJobSourceReferencesAction } = await import('./actions');
+      return getJobSourceReferencesAction(jobId);
+    }
+  });
+
+export const candidateJobStateQueryOptions = (jobId: string) =>
+  queryOptions({
+    queryKey: discoveryKeys.state(jobId),
+    queryFn: async () => {
+      const { getCandidateJobStateAction } = await import('./actions');
+      return getCandidateJobStateAction(jobId);
+    }
+  });
+
+export const opportunityPriorityOptions = (jobId: string) =>
+  queryOptions({
+    queryKey: ['discovery', 'priority', jobId] as const,
+    queryFn: async () => {
+      const { getOpportunityPriorityAction } = await import('./actions');
+      return getOpportunityPriorityAction(jobId);
+    }
+  });

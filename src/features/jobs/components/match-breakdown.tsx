@@ -18,6 +18,23 @@ export function MatchBreakdown({ match, className }: MatchBreakdownProps) {
 
   return (
     <div className={cn('space-y-6', className)}>
+      {match.matchUnavailable && (
+        <Card className='border-amber-200 bg-amber-50/60 dark:bg-amber-950/20 dark:border-amber-800 p-4'>
+          <div className='flex items-start gap-3'>
+            <Icons.warning className='h-5 w-5 text-amber-600 shrink-0 mt-0.5' />
+            <div className='space-y-1 text-xs'>
+              <p className='font-semibold text-amber-900 dark:text-amber-200'>
+                Requirements Extraction Incomplete
+              </p>
+              <p className='text-amber-800/90 dark:text-amber-300/90 leading-relaxed'>
+                {match.unavailableReason ||
+                  "We couldn't reliably identify the job requirements from this page. Please paste the job description to get an accurate match breakdown."}
+              </p>
+            </div>
+          </div>
+        </Card>
+      )}
+
       {/* Requirement Alignment Assessment */}
       <Card className='shadow-xs'>
         <CardHeader className='pb-3'>

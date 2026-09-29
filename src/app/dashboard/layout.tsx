@@ -6,6 +6,7 @@ import { InfobarProvider } from '@/components/ui/infobar';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import type { Metadata } from 'next';
 import { cookies } from 'next/headers';
+import { requireCandidate } from '@/lib/auth';
 
 export const metadata: Metadata = {
   title: 'CareerQuest | AI Job Discovery & Application Assistant',
@@ -18,6 +19,9 @@ export const metadata: Metadata = {
 };
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
+  // Enforce server-side authentication boundary: redirects unauthenticated visitors to /auth/sign-in
+  await requireCandidate();
+
   // Persisting the sidebar state in the cookie.
   const cookieStore = await cookies();
   const defaultOpen = cookieStore.get('sidebar_state')?.value === 'true';

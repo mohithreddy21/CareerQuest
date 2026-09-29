@@ -1,5 +1,6 @@
 import { careerRepository } from '@/services/career-repository';
 import { ResumeChangeStatus, TailoredResumeVersion } from '@/types/tailoring';
+import { ResumeVersion } from '@/types/domain';
 import { knowledgeRetrievalService } from './knowledge-retrieval-service';
 import { resumeTailoringService } from './resume-tailoring-service';
 
@@ -9,21 +10,42 @@ export class ResumeReviewService {
    */
   async getOrCreateTailoredResume(
     jobId: string,
-    candidateId: string = 'cand-1'
+    candidateId: string
   ): Promise<TailoredResumeVersion> {
-    const existing = await careerRepository.getTailoredResumeForJob(jobId);
+    const existing = await careerRepository.getTailoredResumeForJob(jobId, candidateId);
     if (existing && existing.changes.length > 0) {
       return existing;
     }
 
-    const job = await careerRepository.getJobById(jobId);
+    const job = await careerRepository.getJobById(jobId, candidateId);
     if (!job) throw new Error(`Job not found: ${jobId}`);
 
     const analysis = await careerRepository.getJobAnalysis(jobId);
-    if (!analysis) throw new Error(`Job analysis not found: ${jobId}`);
+    if (!analysis) throw new Error(`Job analysis not found for job: ${jobId}`);
 
-    const masterResume = await careerRepository.getMasterResume();
-    if (!masterResume) throw new Error('Master Resume not found.');
+    let masterResume: ResumeVersion | null = await careerRepository.getMasterResume(candidateId);
+    if (!masterResume) {
+      const candProfile = await careerRepository.getCandidateProfile(candidateId);
+      masterResume = {
+        id: `res-master-${candidateId}`,
+        candidateId,
+        jobId: '',
+        title: 'Master Resume',
+        targetRole: candProfile.targetRoles?.[0] || 'Professional',
+        summary: candProfile.professionalSummary || '',
+        experience: candProfile.experience || [],
+        education: candProfile.education || [],
+        skills: candProfile.skills || { technical: [], tools: [], soft: [], other: [] },
+        projects: candProfile.projects || [],
+        certifications: candProfile.certifications || [],
+        approvalState: 'approved',
+        changes: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+    }
+
+    const activeMasterResume: ResumeVersion = masterResume;
 
     // 1. Retrieve approved knowledge
     const retrievedKnowledge = await knowledgeRetrievalService.retrieveKnowledgeForJob(
@@ -35,7 +57,7 @@ export class ResumeReviewService {
     const groundedChanges = await resumeTailoringService.generateGroundedChanges(
       job,
       analysis,
-      masterResume,
+      activeMasterResume,
       retrievedKnowledge
     );
 
@@ -43,17 +65,17 @@ export class ResumeReviewService {
     const initialVersion: TailoredResumeVersion = {
       id: `res-tailored-${job.id}`,
       candidateId,
-      masterResumeId: masterResume.id,
+      masterResumeId: activeMasterResume.id,
       jobId: job.id,
       targetCompany: job.company,
       targetRole: job.title,
       title: `Tailored Resume — ${job.title} (${job.company})`,
-      summary: masterResume.summary,
-      experience: JSON.parse(JSON.stringify(masterResume.experience)),
-      education: JSON.parse(JSON.stringify(masterResume.education)),
-      skills: JSON.parse(JSON.stringify(masterResume.skills)),
-      projects: JSON.parse(JSON.stringify(masterResume.projects)),
-      certifications: JSON.parse(JSON.stringify(masterResume.certifications)),
+      summary: activeMasterResume.summary,
+      experience: JSON.parse(JSON.stringify(activeMasterResume.experience)),
+      education: JSON.parse(JSON.stringify(activeMasterResume.education)),
+      skills: JSON.parse(JSON.stringify(activeMasterResume.skills)),
+      projects: JSON.parse(JSON.stringify(activeMasterResume.projects)),
+      certifications: JSON.parse(JSON.stringify(activeMasterResume.certifications)),
       changes: groundedChanges,
       approvalState: 'draft',
       createdAt: new Date().toISOString(),

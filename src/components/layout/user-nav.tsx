@@ -10,13 +10,12 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
 import { UserAvatarProfile } from '@/components/user-avatar-profile';
-import { useClerk, useUser } from '@clerk/nextjs';
+import { useCandidateUser } from './candidate-user-provider';
 import { useRouter } from 'next/navigation';
 
 export function UserNav() {
   const router = useRouter();
-  const { user } = useUser();
-  const { signOut } = useClerk();
+  const { user, signOut } = useCandidateUser();
 
   const displayName =
     user?.fullName ||

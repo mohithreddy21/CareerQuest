@@ -39,6 +39,8 @@ model Candidate {
   // Phase 7 Discovery & Intelligence
   candidateJobStates CandidateJobState[]
   savedSearches      SavedSearch[]
+  savedSearchAlerts  SavedSearchAlert[]
+  notifications      CandidateNotification[]
 
   @@index([clerkUserId])
   @@index([email])
@@ -196,6 +198,8 @@ model Job {
   events           ApplicationEvent[]
   sourceReferences JobSourceReference[]
   candidateStates  CandidateJobState[]
+  savedSearchAlerts SavedSearchAlert[]
+  notifications    CandidateNotification[]
 
   @@index([jobStatus, isPublic])
   @@index([importedByCandidateId])
@@ -311,14 +315,59 @@ model SavedSearch {
   currency         String?   // ISO currency code or null (Unknown != USD)
   alertFrequency   String    @default("weekly") // 'instant' | 'daily' | 'weekly' | 'never'
   filterVersion    String    @default("1.0")
+  isEnabled        Boolean   @default(true)
+  minMatchScore    Int?
   lastExecutedAt   DateTime?
   lastMatchCount   Int       @default(0)
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  candidate Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  candidate     Candidate               @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  alerts        SavedSearchAlert[]
+  notifications CandidateNotification[]
 
   @@index([candidateId, createdAt])
+}
+
+/// Durable record that a Job matched a SavedSearch and was alerted (Phase 7E)
+model SavedSearchAlert {
+  id                 String    @id @default(cuid())
+  candidateId        String
+  savedSearchId      String
+  jobId              String
+  savedSearchVersion String
+  generatedAt        DateTime  @default(now())
+  deliveredAt        DateTime?
+  status             String    @default("generated") // 'generated' | 'delivered' | 'dismissed'
+
+  candidate   Candidate   @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  savedSearch SavedSearch @relation(fields: [savedSearchId], references: [id], onDelete: Cascade)
+  job         Job         @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@unique([candidateId, savedSearchId, jobId])
+  @@index([candidateId, generatedAt])
+  @@index([savedSearchId])
+  @@index([jobId])
+}
+
+/// Candidate-facing in-app notification ledger (Phase 7E)
+model CandidateNotification {
+  id                   String    @id @default(cuid())
+  candidateId          String
+  type                 String    // 'SAVED_SEARCH_ALERT' | 'NEW_MATCHING_JOB'
+  title                String
+  message              String    @db.Text
+  relatedJobId         String?
+  relatedSavedSearchId String?
+  readAt               DateTime?
+  createdAt            DateTime  @default(now())
+
+  candidate          Candidate    @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  relatedJob         Job?         @relation(fields: [relatedJobId], references: [id], onDelete: SetNull)
+  relatedSavedSearch SavedSearch? @relation(fields: [relatedSavedSearchId], references: [id], onDelete: SetNull)
+
+  @@index([candidateId, createdAt])
+  @@index([candidateId, readAt])
 }
 
 // -----------------------------------------------------------------------------

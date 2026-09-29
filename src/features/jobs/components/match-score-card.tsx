@@ -58,9 +58,17 @@ export function MatchScoreCard({
       badgeClass: 'bg-muted text-muted-foreground border-border',
       scoreClass: 'bg-slate-600 dark:bg-slate-500 text-white',
       ariaLabel: 'Weak fit, probably not a priority'
+    },
+    unavailable: {
+      label: 'Match Unavailable — Requirements Incomplete',
+      badgeClass:
+        'bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border-amber-300 dark:border-amber-700',
+      scoreClass: 'bg-slate-300 dark:bg-slate-700 text-muted-foreground',
+      ariaLabel: 'Match unavailable, incomplete requirements'
     }
   };
 
+  const isUnavailable = recommendation === 'unavailable' || match.matchUnavailable;
   const recInfo = recommendationConfig[recommendation] || recommendationConfig.moderate;
 
   return (
@@ -80,9 +88,13 @@ export function MatchScoreCard({
                 'flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-xl shadow-xs font-bold transition-transform',
                 recInfo.scoreClass
               )}
-              aria-label={`Profile alignment score: ${score} percent`}
+              aria-label={
+                isUnavailable
+                  ? 'Profile alignment unavailable'
+                  : `Profile alignment score: ${score} percent`
+              }
             >
-              <span className='text-xl leading-none'>{score}%</span>
+              <span className='text-xl leading-none'>{isUnavailable ? 'N/A' : `${score}%`}</span>
               <span className='text-[9px] uppercase tracking-wider opacity-90 mt-0.5'>Fit</span>
             </div>
 

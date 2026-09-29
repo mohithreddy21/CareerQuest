@@ -1,6 +1,6 @@
 import PageContainer from '@/components/layout/page-container';
 import { getQueryClient } from '@/lib/query-client';
-import { jobsQueryOptions } from '@/features/jobs/api/queries';
+import { discoveryRankingQueryOptions } from '@/features/jobs/api/queries';
 import DiscoverPage from '@/features/jobs/components/discover-page';
 import { dehydrate, HydrationBoundary } from '@tanstack/react-query';
 import { Suspense } from 'react';
@@ -36,15 +36,18 @@ export default async function Page(props: {
   const parsed = searchParamsCache.parse(searchParams);
   const queryClient = getQueryClient();
   void queryClient.prefetchQuery(
-    jobsQueryOptions({
+    discoveryRankingQueryOptions({
+      tab: (parsed.tab as 'recommended' | 'saved' | 'all') || 'recommended',
       search: parsed.search || undefined,
       source: parsed.source && parsed.source !== 'all' ? parsed.source : undefined,
       workArrangement:
         parsed.workArrangement && parsed.workArrangement !== 'all'
-          ? parsed.workArrangement
+          ? (parsed.workArrangement as 'remote' | 'hybrid' | 'onsite')
           : undefined,
-      sort: parsed.sort || undefined,
-      minMatch: parsed.minMatch || undefined
+      sort: (parsed.sort as 'priority' | 'match_desc' | 'recent') || undefined,
+      minMatch: parsed.minMatch || undefined,
+      stateFilter:
+        (parsed.stateFilter as 'all' | 'saved' | 'unseen' | 'viewed' | 'dismissed') || undefined
     })
   );
 

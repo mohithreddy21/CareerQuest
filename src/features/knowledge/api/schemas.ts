@@ -42,6 +42,8 @@ export const ingestResumeSchema = z.object({
 });
 
 export const resolveProposedItemSchema = z.object({
+  // Retained for testing/compatibility; validated against the authenticated Clerk session in production
+  candidateId: z.string().optional(),
   batchId: z.string().min(1, 'Batch ID is required'),
   tempId: z.string().min(1, 'Item tempId is required'),
   action: z.enum(['accept', 'reject', 'edit']),
@@ -49,5 +51,7 @@ export const resolveProposedItemSchema = z.object({
 });
 
 export const acceptAllProposedSchema = z.object({
+  // Retained for testing/compatibility; validated against the authenticated Clerk session in production
+  candidateId: z.string().optional(),
   batchId: z.string().min(1, 'Batch ID is required')
 });

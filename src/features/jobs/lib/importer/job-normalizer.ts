@@ -91,6 +91,10 @@ export function normalizeJobExtraction(raw: RawJobExtraction): NormalizedJobData
     source: raw.source,
     sourceJobId: raw.sourceJobId ? sanitizeInlineText(raw.sourceJobId) : null,
     sourceUrl,
-    normalizedUrl
+    normalizedUrl,
+    sourceStatus: raw.sourceStatus || 'active',
+    closeReason: raw.closeReason || null,
+    extractionQuality: raw.extractionQuality || 'reliable',
+    extractionQualityReasons: raw.extractionQualityReasons || []
   };
 }

@@ -27,21 +27,33 @@ import {
 import { UserAvatarProfile } from '@/components/user-avatar-profile';
 import { navGroups } from '@/config/nav-config';
 import { useFilteredNavGroups } from '@/hooks/use-nav';
+import { useCandidateUser } from './candidate-user-provider';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import * as React from 'react';
 import { Icons } from '../icons';
 
-const candidateUser = {
-  fullName: 'Alex Chen',
-  emailAddresses: [{ emailAddress: 'alex.chen@example.com' }],
-  imageUrl: ''
-};
-
 export default function AppSidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const filteredGroups = useFilteredNavGroups(navGroups);
+  const { user } = useCandidateUser();
+
+  const candidateUser = React.useMemo(() => {
+    const displayName =
+      user?.fullName ||
+      [user?.firstName, user?.lastName].filter(Boolean).join(' ') ||
+      (user?.username ? `@${user.username}` : 'Candidate Workspace');
+
+    const displayEmail =
+      user?.primaryEmailAddress?.emailAddress || user?.emailAddresses?.[0]?.emailAddress || '';
+
+    return {
+      fullName: displayName,
+      emailAddresses: displayEmail ? [{ emailAddress: displayEmail }] : [],
+      imageUrl: user?.imageUrl || ''
+    };
+  }, [user]);
 
   return (
     <Sidebar collapsible='icon'>

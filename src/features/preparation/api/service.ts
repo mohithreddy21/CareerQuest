@@ -1,4 +1,7 @@
+'use server';
+
 import { careerRepository } from '@/services/career-repository';
+import { requireCandidateId } from '@/lib/auth';
 import { applicationPreparationService } from '../services/preparation-service';
 import {
   PreparationMaterialsResponse,
@@ -8,7 +11,12 @@ import {
   RecordExportPayload,
   ConfirmAppliedPayload
 } from './types';
-import { Application, GroundedCoverLetter, GroundedApplicationQuestion } from '@/types/domain';
+import {
+  Application,
+  GroundedCoverLetter,
+  GroundedApplicationQuestion,
+  ResumeVersion
+} from '@/types/domain';
 import { ResumeTemplateId, ResumeExport } from '@/types/templates';
 import { RESUME_TEMPLATES } from '@/features/templates/constants/templates';
 
@@ -16,13 +24,14 @@ export async function getPreparationMaterials(
   applicationId: string,
   candidateId?: string
 ): Promise<PreparationMaterialsResponse> {
-  const application = await careerRepository.getApplicationById(applicationId, candidateId);
+  const candId = candidateId || (await requireCandidateId({ redirectOnUnauthenticated: false }));
+  const application = await careerRepository.getApplicationById(applicationId, candId);
   if (!application) {
     throw new Error(`Application ${applicationId} not found`);
   }
 
   const job = application.job;
-  const candidate = await careerRepository.getCandidateProfile(candidateId);
+  const candidate = await careerRepository.getCandidateProfile(candId);
   const kb = await careerRepository.getKnowledgeBank(candidate.id);
   const approvedKnowledge = [
     ...kb.skills,
@@ -34,13 +43,33 @@ export async function getPreparationMaterials(
   ].filter((k) => k.status === 'approved');
 
   // Load tailored resume or master resume fallback
-  let tailoredResume = await careerRepository.getTailoredResumeForJob(job.id, candidateId);
+  let tailoredResume: ResumeVersion | null = await careerRepository.getTailoredResumeForJob(
+    job.id,
+    candId
+  );
   if (!tailoredResume) {
-    tailoredResume = await careerRepository.getMasterResume(candidateId);
+    tailoredResume = await careerRepository.getMasterResume(candId);
   }
   if (!tailoredResume) {
-    throw new Error('Candidate resume not found');
+    tailoredResume = {
+      id: `resume-baseline-${candidate.id}`,
+      candidateId: candidate.id,
+      title: 'Master Resume',
+      targetRole: candidate.targetRoles?.[0] || 'Professional',
+      summary: candidate.professionalSummary || '',
+      skills: candidate.skills || { technical: [], tools: [], soft: [], other: [] },
+      experience: candidate.experience || [],
+      education: candidate.education || [],
+      projects: candidate.projects || [],
+      certifications: candidate.certifications || [],
+      changes: [],
+      approvalState: 'draft',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
   }
+
+  const activeResume: ResumeVersion = tailoredResume;
 
   // Selected template
   const selectedTemplateId: ResumeTemplateId = application.selectedTemplateId || 'classic-v1';
@@ -51,7 +80,7 @@ export async function getPreparationMaterials(
       job,
       analysis: application.analysis,
       approvedKnowledge,
-      tailoredResume,
+      tailoredResume: activeResume,
       candidate,
       existingCoverLetter: application.coverLetterData,
       existingQuestions: application.preparedQuestions
@@ -67,14 +96,14 @@ export async function getPreparationMaterials(
         preparedQuestions: questions,
         selectedTemplateId,
         selectedTemplateVersion: RESUME_TEMPLATES[selectedTemplateId]?.version || '1.0',
-        tailoredResumeVersionId: tailoredResume.id
+        tailoredResumeVersionId: activeResume.id
       },
-      candidateId
+      candId
     );
   }
 
   // Load match intelligence for generic gaps & score
-  const jobMatch = await careerRepository.getJobMatch(job.id, candidateId);
+  const jobMatch = await careerRepository.getJobMatch(job.id, candId);
 
   // Compute summary
   const summary = applicationPreparationService.computeApplicationSummary({
@@ -99,10 +128,11 @@ export async function updateCoverLetterDraft(
   payload: UpdateCoverLetterPayload,
   candidateId?: string
 ): Promise<GroundedCoverLetter> {
-  const application = await careerRepository.getApplicationById(payload.applicationId, candidateId);
+  const candId = candidateId || (await requireCandidateId({ redirectOnUnauthenticated: false }));
+  const application = await careerRepository.getApplicationById(payload.applicationId, candId);
   if (!application) throw new Error(`Application not found: ${payload.applicationId}`);
 
-  const candidate = await careerRepository.getCandidateProfile(candidateId);
+  const candidate = await careerRepository.getCandidateProfile(candId);
   const kb = await careerRepository.getKnowledgeBank(candidate.id);
   const approvedKnowledge = [
     ...kb.skills,
@@ -131,7 +161,7 @@ export async function updateCoverLetterDraft(
       coverLetterData: updatedCoverLetter,
       coverLetter: updatedCoverLetter.body
     },
-    candidateId
+    candId
   );
   return updatedCoverLetter;
 }
@@ -140,10 +170,11 @@ export async function updateQuestionAnswer(
   payload: UpdateQuestionPayload,
   candidateId?: string
 ): Promise<GroundedApplicationQuestion> {
-  const application = await careerRepository.getApplicationById(payload.applicationId, candidateId);
+  const candId = candidateId || (await requireCandidateId({ redirectOnUnauthenticated: false }));
+  const application = await careerRepository.getApplicationById(payload.applicationId, candId);
   if (!application) throw new Error(`Application not found: ${payload.applicationId}`);
 
-  const candidate = await careerRepository.getCandidateProfile(candidateId);
+  const candidate = await careerRepository.getCandidateProfile(candId);
   const kb = await careerRepository.getKnowledgeBank(candidate.id);
   const approvedKnowledge = [
     ...kb.skills,
@@ -175,7 +206,7 @@ export async function updateQuestionAnswer(
     {
       preparedQuestions: questions
     },
-    candidateId
+    candId
   );
 
   return verifiedQuestion;
@@ -185,6 +216,7 @@ export async function updateApplicationTemplateSelection(
   payload: UpdateTemplatePayload,
   candidateId?: string
 ): Promise<{ templateId: ResumeTemplateId }> {
+  const candId = candidateId || (await requireCandidateId({ redirectOnUnauthenticated: false }));
   const version = RESUME_TEMPLATES[payload.templateId]?.version || '1.0';
   await careerRepository.updateApplicationPreparation(
     payload.applicationId,
@@ -192,7 +224,7 @@ export async function updateApplicationTemplateSelection(
       selectedTemplateId: payload.templateId,
       selectedTemplateVersion: version
     },
-    candidateId
+    candId
   );
   return { templateId: payload.templateId };
 }
@@ -201,10 +233,11 @@ export async function recordResumeExportEvent(
   payload: RecordExportPayload,
   candidateId?: string
 ): Promise<ResumeExport> {
+  const candId = candidateId || (await requireCandidateId({ redirectOnUnauthenticated: false }));
   await careerRepository.recordApplicationExport(
     payload.applicationId,
     payload.exportRecord,
-    candidateId
+    candId
   );
   return payload.exportRecord;
 }
@@ -214,9 +247,10 @@ export async function confirmApplicationSubmission(
   candidateId?: string,
   expectedVersion?: number
 ): Promise<Application> {
+  const candId = candidateId || (await requireCandidateId({ redirectOnUnauthenticated: false }));
   return careerRepository.confirmApplicationSubmission(
     payload,
-    candidateId,
+    candId,
     expectedVersion ?? payload.expectedVersion
   );
 }

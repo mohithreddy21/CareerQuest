@@ -14,6 +14,36 @@ export class MockMatchProvider implements MatchProvider {
     analysis: JobAnalysis,
     candidate: CandidateProfile
   ): Promise<JobMatch> {
+    // CRITICAL MATCHING SAFEGUARD:
+    // If extraction quality is insufficient or requirements could not be parsed,
+    // NEVER generate a normal-looking match score.
+    if (
+      job.extractionQuality === 'insufficient' ||
+      analysis.analysisStatus === 'error' ||
+      (analysis.technicalRequirements.length === 0 &&
+        analysis.extractedRequirements.length === 0 &&
+        job.requiredSkills.length === 0 &&
+        job.responsibilities.length === 0)
+    ) {
+      return {
+        id: `match-${job.id}-${candidate.id}`,
+        jobId: job.id,
+        candidateId: candidate.id,
+        score: 0,
+        recommendation: 'unavailable',
+        headline: 'Match Unavailable',
+        reasoning:
+          "We couldn't reliably identify the job requirements from this page. Please paste the job description to get an accurate match score.",
+        strongMatches: [],
+        partialMatches: [],
+        missingRequirements: [],
+        supportingCandidateEvidence: [],
+        matchUnavailable: true,
+        unavailableReason:
+          "We couldn't reliably identify the job requirements from this page. Please paste the job description to get an accurate match score."
+      };
+    }
+
     const strongMatches: MatchPoint[] = [];
     const partialMatches: MatchPoint[] = [];
     const missingRequirements: MatchPoint[] = [];
@@ -156,14 +186,22 @@ export class MockMatchProvider implements MatchProvider {
 
     // Evaluate experience & seniority alignment
     if (analysis.seniority === 'senior' || analysis.seniority === 'lead') {
-      const totalYears = 7; // Alex Chen: 2019-06 to Present = ~7 years
-      const expEvidence = findVerifiedEvidence('leadership');
-      strongMatches.push({
-        title: `${analysis.seniority.toUpperCase()} Seniority Level`,
-        detail: `Candidate brings ~${totalYears} years of verified full-stack software engineering experience.`,
-        evidenceSource: expEvidence?.source,
-        evidenceSnippet: expEvidence?.snippet
-      });
+      const hasExp = candidate.experience && candidate.experience.length > 0;
+      if (hasExp) {
+        const totalYears = 7; // Regression benchmark: 2019-06 to Present = ~7 years
+        const expEvidence = findVerifiedEvidence('leadership');
+        strongMatches.push({
+          title: `${analysis.seniority.toUpperCase()} Seniority Level`,
+          detail: `Candidate brings ~${totalYears} years of verified full-stack software engineering experience.`,
+          evidenceSource: expEvidence?.source,
+          evidenceSnippet: expEvidence?.snippet
+        });
+      } else {
+        missingRequirements.push({
+          title: `${analysis.seniority.toUpperCase()} Seniority Level`,
+          detail: `Role requires senior/lead level experience, but no verified employment history is recorded yet in candidate profile.`
+        });
+      }
     }
 
     // Deterministic Score Calculation
@@ -180,7 +218,7 @@ export class MockMatchProvider implements MatchProvider {
     if (missingRequirements.length > 0) {
       rawScore = Math.min(rawScore, 85 - (missingRequirements.length - 1) * 10);
     }
-    const score = Math.max(45, Math.min(96, rawScore));
+    const score = Math.max(10, Math.min(96, rawScore));
 
     // Recommendation mapping
     let recommendation: JobMatch['recommendation'] = 'strong';

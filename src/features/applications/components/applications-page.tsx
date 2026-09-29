@@ -261,7 +261,24 @@ export default function ApplicationsPage() {
       </div>
 
       {/* Main Content Area */}
-      {filteredApplications.length === 0 ? (
+      {applications.length === 0 ? (
+        <Card className='p-12 text-center'>
+          <div className='flex flex-col items-center justify-center gap-3'>
+            <Icons.kanban className='h-10 w-10 text-muted-foreground opacity-50' />
+            <h2 className='text-base font-semibold text-foreground'>No applications tracked yet</h2>
+            <p className='text-xs text-muted-foreground max-w-md'>
+              Explore recommended opportunities, tailor your resume to job requirements, and track
+              your active application pipeline here.
+            </p>
+            <Link
+              href='/dashboard/discover'
+              className={cn(buttonVariants({ size: 'sm' }), 'text-xs mt-2 gap-1.5')}
+            >
+              <Icons.search className='h-3.5 w-3.5' /> Discover Opportunities
+            </Link>
+          </div>
+        </Card>
+      ) : filteredApplications.length === 0 ? (
         <Card className='p-12 text-center'>
           <div className='flex flex-col items-center justify-center gap-3'>
             <Icons.kanban className='h-10 w-10 text-muted-foreground opacity-50' />

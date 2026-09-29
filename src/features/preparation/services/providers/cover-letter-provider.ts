@@ -28,7 +28,7 @@ export class MockCoverLetterProvider implements CoverLetterProvider {
     tailoredResume: TailoredResumeVersion;
     candidate: CandidateProfile;
   }): Promise<GroundedCoverLetter> {
-    const candidateName = candidate.name || 'Alex Chen';
+    const candidateName = candidate.name || 'Candidate';
     const company = job.company;
     const role = job.title;
 
@@ -56,6 +56,17 @@ export class MockCoverLetterProvider implements CoverLetterProvider {
       sourceKnowledgeItemIds.push(apexExp.id);
       evidenceReferences.push(
         'Apex Cloud Systems: Distributed database migration & query optimization'
+      );
+    }
+
+    const otherExps = approvedKnowledge.filter(
+      (k) => k.category === 'experience' && k.id !== veloceExp?.id && k.id !== apexExp?.id
+    );
+    for (const exp of otherExps.slice(0, 2)) {
+      sourceKnowledgeItemIds.push(exp.id);
+      const c = exp.content as { employer?: string; role?: string };
+      evidenceReferences.push(
+        `${c.employer || 'Professional Experience'}: ${c.role || 'Software Engineering'}`
       );
     }
 
@@ -94,16 +105,43 @@ export class MockCoverLetterProvider implements CoverLetterProvider {
     const skillsToMention =
       verifiedSkills.length > 0
         ? verifiedSkills.slice(0, 3).join(', ')
-        : 'full-stack architecture, TypeScript, and distributed systems';
+        : approvedSkillNames.length > 0
+          ? approvedSkillNames.slice(0, 3).join(', ')
+          : 'software engineering and disciplined problem solving';
+
+    const hasExperience = approvedKnowledge.some((k) => k.category === 'experience');
+    const introExperience = hasExperience
+      ? 'With a strong track record of engineering impact and hands-on system building,'
+      : 'With a commitment to high standards and structured engineering practices,';
+
+    let experienceParagraph = '';
+    if (veloceExp || apexExp) {
+      experienceParagraph = `In my current role at Veloce Labs, I led the core platform engineering team serving over 120,000 monthly active users. Key outcomes included modernizing our client-server streaming architecture, optimizing p95 page load latencies from 2.4s down to 420ms through SSR streaming and query normalization, and deploying tiered caching that cut Redis throughput bottlenecks by 45%. Previously at Apex Cloud Systems, I helped execute zero-downtime relational database migrations for enterprise customer workloads, establishing high-reliability testing standards.`;
+    } else if (otherExps.length > 0) {
+      const topExp = otherExps[0].content as {
+        employer?: string;
+        role?: string;
+        achievements?: string[];
+      };
+      const roleStr = topExp.role ? ` as ${topExp.role}` : '';
+      const atStr = topExp.employer ? ` at ${topExp.employer}` : '';
+      const achStr =
+        topExp.achievements && topExp.achievements.length > 0
+          ? ` Key focus areas included ${topExp.achievements[0]}.`
+          : '';
+      experienceParagraph = `Throughout my professional career${roleStr}${atStr}, I focused on delivering maintainable, high-impact software solutions.${achStr}`;
+    } else {
+      experienceParagraph = `I am eager to contribute my background and disciplined engineering approach to the initiatives and team objectives at ${company}.`;
+    }
 
     const bodyParagraphs = [
-      `Dear ${company} Hiring Team,\n\nI am writing to submit my application for the ${role} position at ${company}. With over seven years of hands-on experience architecting high-scale web platforms and distributed backend pipelines, I have followed ${company}'s technical trajectory and developer-first products with admiration.`,
+      `Dear ${company} Hiring Team,\n\nI am writing to submit my application for the ${role} position at ${company}. ${introExperience} I have followed ${company}'s technical trajectory and developer-first products with admiration.`,
 
-      `In my current role at Veloce Labs, I led the core platform engineering team serving over 120,000 monthly active users. Key outcomes included modernizing our client-server streaming architecture, optimizing p95 page load latencies from 2.4s down to 420ms through SSR streaming and query normalization, and deploying tiered caching that cut Redis throughput bottlenecks by 45%. Previously at Apex Cloud Systems, I helped execute zero-downtime relational database migrations for enterprise customer workloads, establishing high-reliability testing standards.`,
+      experienceParagraph,
 
-      `My core strengths in ${skillsToMention} and distributed systems design align closely with the engineering initiatives outlined for ${company}. I am passionate about engineering craftsmanship, deep observability, and fostering collaborative teams that deliver resilient software.`,
+      `My core strengths in ${skillsToMention} align closely with the engineering initiatives outlined for ${company}. I am passionate about engineering craftsmanship, deep observability, and fostering collaborative teams that deliver resilient software.`,
 
-      `Thank you for your time and consideration. I welcome the opportunity to discuss how my verified background and technical leadership can support ${company}'s engineering goals.\n\nSincerely,\n${candidateName}`
+      `Thank you for your time and consideration. I welcome the opportunity to discuss how my verified background and technical capabilities can support ${company}'s engineering goals.\n\nSincerely,\n${candidateName}`
     ];
 
     return {

@@ -13,6 +13,8 @@ export type JobSourceType =
 
 export type SalaryInterval = 'hourly' | 'daily' | 'weekly' | 'monthly' | 'yearly';
 
+export type ExtractionQualityState = 'reliable' | 'partial' | 'insufficient';
+
 export interface RawJobExtraction {
   title: string;
   company: string;
@@ -33,6 +35,10 @@ export interface RawJobExtraction {
   sourceJobId?: string | null;
   sourceUrl: string;
   normalizedUrl?: string;
+  sourceStatus?: 'active' | 'closed' | 'unknown';
+  closeReason?: string | null;
+  extractionQuality?: ExtractionQualityState;
+  extractionQualityReasons?: string[];
 }
 
 export interface SourceDetectionResult {
@@ -102,6 +108,10 @@ export interface NormalizedJobData {
   sourceJobId?: string | null;
   sourceUrl: string;
   normalizedUrl: string;
+  sourceStatus?: 'active' | 'closed' | 'unknown';
+  closeReason?: string | null;
+  extractionQuality?: ExtractionQualityState;
+  extractionQualityReasons?: string[];
 }
 
 export interface DuplicateCheckResult {
@@ -121,4 +131,6 @@ export interface ImportJobResult {
   adapterName?: string;
   error?: string;
   errorCode?: AdapterErrorCode;
+  extractionQuality?: 'reliable' | 'partial' | 'insufficient';
+  extractionQualityReasons?: string[];
 }

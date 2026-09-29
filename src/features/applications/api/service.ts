@@ -1,3 +1,5 @@
+'use server';
+
 import { careerRepository } from '@/services/career-repository';
 import {
   AddApplicationContactPayload,
@@ -14,6 +16,7 @@ import {
   UpdateApplicationStatusPayload,
   UpdateInterviewStagePayload
 } from './types';
+import { requireCandidateId } from '@/lib/auth';
 import { Application, ApplicationEvent } from '@/types/domain';
 
 export async function getApplications(
@@ -25,21 +28,27 @@ export async function getApplications(
   },
   candidateId?: string
 ): Promise<ApplicationWithJob[]> {
-  return careerRepository.getApplications(filters, candidateId);
+  const resolvedId =
+    candidateId || (await requireCandidateId({ redirectOnUnauthenticated: false }));
+  return careerRepository.getApplications(filters, resolvedId);
 }
 
 export async function getApplicationById(
   id: string,
   candidateId?: string
 ): Promise<ApplicationDetail | null> {
-  return careerRepository.getApplicationById(id, candidateId);
+  const resolvedId =
+    candidateId || (await requireCandidateId({ redirectOnUnauthenticated: false }));
+  return careerRepository.getApplicationById(id, resolvedId);
 }
 
 export async function getApplicationByJobId(
   jobId: string,
   candidateId?: string
 ): Promise<Application | null> {
-  return careerRepository.getApplicationByJobId(jobId, candidateId);
+  const resolvedId =
+    candidateId || (await requireCandidateId({ redirectOnUnauthenticated: false }));
+  return careerRepository.getApplicationByJobId(jobId, resolvedId);
 }
 
 export async function updateApplicationStatus(
@@ -83,7 +92,9 @@ export async function getApplicationEvents(
   applicationId?: string,
   candidateId?: string
 ): Promise<ApplicationEvent[]> {
-  return careerRepository.getApplicationEvents(applicationId, candidateId);
+  const resolvedId =
+    candidateId || (await requireCandidateId({ redirectOnUnauthenticated: false }));
+  return careerRepository.getApplicationEvents(applicationId, resolvedId);
 }
 
 export async function updateApplicationFollowUp(

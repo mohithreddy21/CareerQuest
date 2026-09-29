@@ -157,6 +157,7 @@ export const Icons = {
   // Files
   page: IconFile,
   post: IconFileText,
+  folder: IconFolder,
   fileTypePdf: IconFileTypePdf,
   fileTypeDoc: IconFileTypeDoc,
   fileTypeXls: IconFileTypeXls,

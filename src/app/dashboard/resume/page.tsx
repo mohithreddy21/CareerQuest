@@ -1,10 +1,15 @@
 import PageContainer from '@/components/layout/page-container';
 import { getQueryClient } from '@/lib/query-client';
 import { candidateProfileQueryOptions } from '@/features/resume/api/queries';
+import {
+  knowledgeBankQueryOptions,
+  proposedBatchesQueryOptions
+} from '@/features/knowledge/api/queries';
 import ResumeProfilePage from '@/features/resume/components/resume-profile-page';
 import { dehydrate, HydrationBoundary } from '@tanstack/react-query';
 import { Suspense } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { requireCandidateId } from '@/lib/auth';
 
 export const metadata = {
   title: 'Resume & Profile | CareerQuest'
@@ -25,7 +30,10 @@ function ProfileSkeleton() {
 
 export default async function Page() {
   const queryClient = getQueryClient();
+  const candidateId = await requireCandidateId({ redirectOnUnauthenticated: false });
   void queryClient.prefetchQuery(candidateProfileQueryOptions());
+  void queryClient.prefetchQuery(knowledgeBankQueryOptions(candidateId));
+  void queryClient.prefetchQuery(proposedBatchesQueryOptions(candidateId));
 
   return (
     <PageContainer
@@ -34,7 +42,7 @@ export default async function Page() {
     >
       <HydrationBoundary state={dehydrate(queryClient)}>
         <Suspense fallback={<ProfileSkeleton />}>
-          <ResumeProfilePage />
+          <ResumeProfilePage candidateId={candidateId} />
         </Suspense>
       </HydrationBoundary>
     </PageContainer>

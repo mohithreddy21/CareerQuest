@@ -1,13 +1,22 @@
-import { clerkMiddleware } from '@clerk/nextjs/server';
+import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 import { NextResponse, type NextRequest, type NextFetchEvent } from 'next/server';
 
-// Route protection lives in the /dashboard layout via `auth.protect()`.
-// clerkMiddleware() only attaches the auth context to every request.
+const isProtectedRoute = createRouteMatcher(['/dashboard(.*)']);
+
 export default function proxy(req: NextRequest, evt: NextFetchEvent) {
   if (!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) {
+    if (isProtectedRoute(req)) {
+      const signInUrl = new URL('/auth/sign-in', req.url);
+      return NextResponse.redirect(signInUrl);
+    }
     return NextResponse.next();
   }
-  return clerkMiddleware()(req, evt);
+
+  return clerkMiddleware(async (auth, request) => {
+    if (isProtectedRoute(request)) {
+      await auth.protect();
+    }
+  })(req, evt);
 }
 
 export const config = {

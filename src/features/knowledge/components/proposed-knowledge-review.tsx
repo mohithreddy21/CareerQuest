@@ -22,7 +22,7 @@ import { Icons } from '@/components/icons';
 import { toast } from 'sonner';
 
 export interface ProposedKnowledgeReviewProps {
-  candidateId: string;
+  candidateId?: string;
   batches: ProposedIngestionBatch[];
 }
 
@@ -67,7 +67,7 @@ function getConflictBadge(status: IngestionConflictStatus) {
   }
 }
 
-export function ProposedKnowledgeReview({ candidateId, batches }: ProposedKnowledgeReviewProps) {
+export function ProposedKnowledgeReview({ batches }: ProposedKnowledgeReviewProps) {
   const queryClient = useQueryClient();
 
   const resolveMutation = useMutation({
@@ -138,7 +138,7 @@ export function ProposedKnowledgeReview({ candidateId, batches }: ProposedKnowle
                   <Button
                     size='sm'
                     disabled={safeCount === 0 || acceptAllMutation.isPending}
-                    onClick={() => acceptAllMutation.mutate({ candidateId, batchId: batch.id })}
+                    onClick={() => acceptAllMutation.mutate({ batchId: batch.id })}
                     className='text-xs gap-1.5 shadow-xs'
                   >
                     <Icons.check className='h-3.5 w-3.5' />
@@ -155,7 +155,6 @@ export function ProposedKnowledgeReview({ candidateId, batches }: ProposedKnowle
                   item={item}
                   onResolve={(action, editedContent) =>
                     resolveMutation.mutate({
-                      candidateId,
                       batchId: batch.id,
                       tempId: item.tempId,
                       action,

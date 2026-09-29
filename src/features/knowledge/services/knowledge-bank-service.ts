@@ -157,9 +157,13 @@ export class KnowledgeBankService {
           const kb = await careerRepository.getKnowledgeBank(candidateId);
           const existing = this.findItemInBank(kb, propItem.existingItemId);
           if (existing) {
-            await careerRepository.updateKnowledgeItem(propItem.existingItemId, {
-              provenance: [...existing.provenance, provenance]
-            });
+            await careerRepository.updateKnowledgeItem(
+              propItem.existingItemId,
+              {
+                provenance: [...existing.provenance, provenance]
+              },
+              candidateId
+            );
           }
         }
       } else if (propItem.conflictStatus === 'conflict' && propItem.existingItemId) {
@@ -167,11 +171,15 @@ export class KnowledgeBankService {
         const kb = await careerRepository.getKnowledgeBank(candidateId);
         const existing = this.findItemInBank(kb, propItem.existingItemId);
         if (existing) {
-          await careerRepository.updateKnowledgeItem(propItem.existingItemId, {
-            content: finalContent,
-            provenance: [...existing.provenance, provenance],
-            updatedAt: new Date().toISOString()
-          });
+          await careerRepository.updateKnowledgeItem(
+            propItem.existingItemId,
+            {
+              content: finalContent,
+              provenance: [...existing.provenance, provenance],
+              updatedAt: new Date().toISOString()
+            },
+            candidateId
+          );
         }
       } else {
         // Create new approved knowledge item
@@ -185,7 +193,7 @@ export class KnowledgeBankService {
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
         };
-        await careerRepository.saveKnowledgeItem(newItem);
+        await careerRepository.saveKnowledgeItem(newItem, candidateId);
       }
     }
 
@@ -193,10 +201,10 @@ export class KnowledgeBankService {
     batch.items.splice(propItemIdx, 1);
 
     if (batch.items.length === 0) {
-      await careerRepository.deleteProposedBatch(batchId);
+      await careerRepository.deleteProposedBatch(batchId, candidateId);
       return { resolved: true, remainingInBatch: 0 };
     } else {
-      await careerRepository.saveProposedBatch(batch);
+      await careerRepository.saveProposedBatch(batch, candidateId);
       return { resolved: true, remainingInBatch: batch.items.length };
     }
   }
@@ -207,7 +215,7 @@ export class KnowledgeBankService {
   async acceptAllProposedItems(candidateId: string, batchId: string): Promise<void> {
     const batches = await careerRepository.getProposedBatches(candidateId);
     const batch = batches.find((b) => b.id === batchId);
-    if (!batch) return;
+    if (!batch) throw new Error(`Batch ${batchId} not found`);
 
     // Clone list to process
     const itemsToProcess = [...batch.items];

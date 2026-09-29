@@ -14,6 +14,8 @@ import {
   CandidateJobState,
   CandidateJobStatus,
   SavedSearch,
+  SavedSearchAlert,
+  CandidateNotification,
   NextAction,
   ResumeChange,
   ResumeChangeStatus,
@@ -44,6 +46,29 @@ import {
   detectSource,
   normalizeJobUrl
 } from '@/features/jobs/lib/importer';
+import {
+  evaluateDeduplication,
+  shouldPromoteNewSource,
+  selectBestPrimarySource,
+  aggregateJobStatus,
+  normalizeCompany,
+  isSourceUsable
+} from '@/features/jobs/lib/dedup';
+import {
+  DEFAULT_RANKING_CONFIG,
+  DEFAULT_DISCOVERY_PAGE_SIZE,
+  MAX_DISCOVERY_PAGE_SIZE,
+  DiscoveryRankingParams,
+  DiscoveryRankingResponse,
+  DiscoveryRankingCursorPayload,
+  RankedOpportunity,
+  buildRankingContextKey,
+  calculateOpportunityPriority,
+  compareDiscoveryOrder,
+  decodeCursor,
+  encodeCursor,
+  isRowAfterCursor
+} from '@/features/jobs/lib/ranking';
 import { analysisService } from '@/features/jobs/services/analysis-service';
 import { matchService } from '@/features/jobs/services/match-service';
 import {
@@ -74,7 +99,10 @@ export class InMemoryCareerRepository implements ICareerRepository {
   };
   private jobSourceReferences: JobSourceReference[] = [];
   private candidateJobStates: Map<string, CandidateJobState> = new Map();
+  private previousJobStates: Map<string, CandidateJobStatus> = new Map();
   private savedSearches: SavedSearch[] = [];
+  private savedSearchAlerts: SavedSearchAlert[] = [];
+  private candidateNotifications: CandidateNotification[] = [];
 
   constructor() {
     this.db = JSON.parse(JSON.stringify(initialCareerData));
@@ -308,8 +336,11 @@ export class InMemoryCareerRepository implements ICareerRepository {
         return {
           success: false,
           isDuplicate: true,
+          duplicateTier: 'exact_match',
+          duplicateGroupId: existingJob?.duplicateGroupId,
           existingJob,
           job: existingJob,
+          sourceReference: JSON.parse(JSON.stringify(existingRef)),
           analysis,
           match,
           adapterName: detection.source === 'manual' ? 'Manual Job Text' : detection.source,
@@ -335,10 +366,16 @@ export class InMemoryCareerRepository implements ICareerRepository {
 
     const norm = ingestResult.data;
 
-    // 2. Check for exact source duplicate: (source, normalizedUrl)
-    const existingRef = this.jobSourceReferences.find(
+    // 2. Post-fetch exact duplicate check: (source, normalizedUrl) or (source, sourceJobId)
+    let existingRef = this.jobSourceReferences.find(
       (ref) => ref.source === norm.source && ref.normalizedUrl === norm.normalizedUrl
     );
+
+    if (!existingRef && norm.sourceJobId) {
+      existingRef = this.jobSourceReferences.find(
+        (ref) => ref.source === norm.source && ref.sourceJobId === norm.sourceJobId
+      );
+    }
 
     if (existingRef && !force) {
       const existingJob = this.db.jobs.find((j) => j.id === existingRef.jobId);
@@ -350,8 +387,11 @@ export class InMemoryCareerRepository implements ICareerRepository {
       return {
         success: false,
         isDuplicate: true,
+        duplicateTier: 'exact_match',
+        duplicateGroupId: existingJob?.duplicateGroupId,
         existingJob,
         job: existingJob,
+        sourceReference: JSON.parse(JSON.stringify(existingRef)),
         analysis,
         match,
         adapterName: ingestResult.adapterName,
@@ -359,7 +399,76 @@ export class InMemoryCareerRepository implements ICareerRepository {
       };
     }
 
-    // 3. Create Job and JobSourceReference
+    // 3. Cross-Source Deduplication Check (Phase 7C Tier 2 / 3 / 4)
+    const candidateJobs = await this.findDuplicateCandidates(norm.company, norm.title, candId);
+    const dedupEval = evaluateDeduplication(norm, candidateJobs);
+
+    // --- CASE A: Strong Duplicate (Tier 2) ---
+    if (dedupEval.tier === 'strong_duplicate' && dedupEval.canonicalJob && !force) {
+      const canonicalJob = dedupEval.canonicalJob;
+      const groupId = canonicalJob.duplicateGroupId || `dup-group-${canonicalJob.id}`;
+
+      if (!canonicalJob.duplicateGroupId) {
+        await this.updateJobDuplicateGroup(canonicalJob.id, groupId);
+        canonicalJob.duplicateGroupId = groupId;
+      }
+
+      const existingRefs = await this.getJobSourceReferences(canonicalJob.id);
+      const currentPrimary = existingRefs.find((r) => r.isPrimary);
+      const incomingStatus = norm.sourceStatus || 'active';
+      const shouldPromote =
+        incomingStatus !== 'closed' && shouldPromoteNewSource(norm.source, currentPrimary);
+
+      const newRef = await this.addJobSourceReference({
+        jobId: canonicalJob.id,
+        source: norm.source,
+        sourceJobId: norm.sourceJobId || null,
+        sourceUrl: norm.sourceUrl,
+        normalizedUrl: norm.normalizedUrl,
+        sourceStatus: incomingStatus,
+        verificationStatus: 'verified_accessible',
+        lastVerifiedAt: new Date(),
+        lastVerificationError: norm.closeReason || null,
+        isPrimary: shouldPromote,
+        referenceRole: shouldPromote ? 'primary' : 'alternative',
+        firstSeenAt: new Date(),
+        lastSeenAt: new Date()
+      });
+
+      let analysis = await this.getJobAnalysis(canonicalJob.id);
+      if (!analysis) {
+        analysis = await analysisService.analyzeJob(canonicalJob);
+        await this.saveJobAnalysis(analysis);
+      }
+
+      let match = await this.getJobMatch(canonicalJob.id, candId);
+      if (!match) {
+        const candidateProfile = await this.getCandidateProfile(candId);
+        if (candidateProfile) {
+          match = await matchService.calculateMatch(canonicalJob, analysis, candidateProfile);
+          await this.saveJobMatch(match, candId);
+        }
+      }
+
+      const updatedCanonicalJob = await this.getJobById(canonicalJob.id, candId);
+
+      return {
+        success: true,
+        isDuplicate: true,
+        duplicateTier: 'strong_duplicate',
+        duplicateGroupId: groupId,
+        existingJob: canonicalJob,
+        job: updatedCanonicalJob || canonicalJob,
+        sourceReference: newRef,
+        analysis: analysis || undefined,
+        match: match || undefined,
+        adapterName: ingestResult.adapterName,
+        evidence: dedupEval.evidence,
+        possibleDuplicates: dedupEval.possibleDuplicates
+      };
+    }
+
+    // --- CASE B: Unique (Tier 4) or Possible Duplicate (Tier 3) ---
     const newJob: Job = {
       id: `job-import-${Date.now()}`,
       title: norm.title,
@@ -384,10 +493,12 @@ export class InMemoryCareerRepository implements ICareerRepository {
       postedDate: norm.postedDate || undefined,
       source: norm.source,
       originalUrl: norm.sourceUrl,
-      jobStatus: 'active',
+      jobStatus: norm.sourceStatus === 'closed' ? 'closed' : 'active',
       normalizedAt: new Date().toISOString(),
       isPublic: false,
-      importedByCandidateId: candId
+      importedByCandidateId: candId,
+      extractionQuality: norm.extractionQuality,
+      extractionQualityReasons: norm.extractionQualityReasons
     };
 
     this.db.jobs.push(newJob);
@@ -400,10 +511,10 @@ export class InMemoryCareerRepository implements ICareerRepository {
       sourceJobId: norm.sourceJobId || null,
       sourceUrl: norm.sourceUrl,
       normalizedUrl: norm.normalizedUrl,
-      sourceStatus: 'active',
+      sourceStatus: norm.sourceStatus || 'active',
       verificationStatus: 'verified_accessible',
       lastVerifiedAt: now,
-      lastVerificationError: null,
+      lastVerificationError: norm.closeReason || null,
       isPrimary: true,
       referenceRole: 'primary',
       firstSeenAt: now,
@@ -460,10 +571,14 @@ export class InMemoryCareerRepository implements ICareerRepository {
 
     return {
       success: true,
+      isDuplicate: false,
+      duplicateTier: dedupEval.tier,
       job: newJob,
+      sourceReference: newRef,
       analysis,
       match,
-      adapterName: ingestResult.adapterName
+      adapterName: ingestResult.adapterName,
+      possibleDuplicates: dedupEval.possibleDuplicates
     };
   }
 
@@ -491,6 +606,74 @@ export class InMemoryCareerRepository implements ICareerRepository {
 
     const norm = ingestResult.data;
 
+    // Cross-Source Deduplication Check
+    const candidateJobs = await this.findDuplicateCandidates(norm.company, norm.title, candId);
+    const dedupEval = evaluateDeduplication(norm, candidateJobs);
+
+    // --- CASE A: Strong Duplicate (Tier 2) ---
+    if (dedupEval.tier === 'strong_duplicate' && dedupEval.canonicalJob) {
+      const canonicalJob = dedupEval.canonicalJob;
+      const groupId = canonicalJob.duplicateGroupId || `dup-group-${canonicalJob.id}`;
+
+      if (!canonicalJob.duplicateGroupId) {
+        await this.updateJobDuplicateGroup(canonicalJob.id, groupId);
+        canonicalJob.duplicateGroupId = groupId;
+      }
+
+      const existingRefs = await this.getJobSourceReferences(canonicalJob.id);
+      const currentPrimary = existingRefs.find((r) => r.isPrimary);
+      const shouldPromote = shouldPromoteNewSource('manual', currentPrimary);
+
+      const newRef = await this.addJobSourceReference({
+        jobId: canonicalJob.id,
+        source: 'manual',
+        sourceJobId: null,
+        sourceUrl: norm.sourceUrl,
+        normalizedUrl: norm.normalizedUrl,
+        sourceStatus: 'active',
+        verificationStatus: 'verified_accessible',
+        lastVerifiedAt: new Date(),
+        lastVerificationError: null,
+        isPrimary: shouldPromote,
+        referenceRole: shouldPromote ? 'primary' : 'alternative',
+        firstSeenAt: new Date(),
+        lastSeenAt: new Date()
+      });
+
+      let analysis = await this.getJobAnalysis(canonicalJob.id);
+      if (!analysis) {
+        analysis = await analysisService.analyzeJob(canonicalJob);
+        await this.saveJobAnalysis(analysis);
+      }
+
+      let match = await this.getJobMatch(canonicalJob.id, candId);
+      if (!match) {
+        const candidateProfile = await this.getCandidateProfile(candId);
+        if (candidateProfile) {
+          match = await matchService.calculateMatch(canonicalJob, analysis, candidateProfile);
+          await this.saveJobMatch(match, candId);
+        }
+      }
+
+      const updatedCanonicalJob = await this.getJobById(canonicalJob.id, candId);
+
+      return {
+        success: true,
+        isDuplicate: true,
+        duplicateTier: 'strong_duplicate',
+        duplicateGroupId: groupId,
+        existingJob: canonicalJob,
+        job: updatedCanonicalJob || canonicalJob,
+        sourceReference: newRef,
+        analysis: analysis || undefined,
+        match: match || undefined,
+        adapterName: ingestResult.adapterName,
+        evidence: dedupEval.evidence,
+        possibleDuplicates: dedupEval.possibleDuplicates
+      };
+    }
+
+    // --- CASE B: Unique (Tier 4) or Possible Duplicate (Tier 3) ---
     const newJob: Job = {
       id: `job-import-${Date.now()}`,
       title: norm.title,
@@ -518,7 +701,9 @@ export class InMemoryCareerRepository implements ICareerRepository {
       jobStatus: 'active',
       normalizedAt: new Date().toISOString(),
       isPublic: false,
-      importedByCandidateId: candId
+      importedByCandidateId: candId,
+      extractionQuality: norm.extractionQuality,
+      extractionQualityReasons: norm.extractionQualityReasons
     };
 
     this.db.jobs.push(newJob);
@@ -582,10 +767,14 @@ export class InMemoryCareerRepository implements ICareerRepository {
 
     return {
       success: true,
+      isDuplicate: false,
+      duplicateTier: dedupEval.tier,
       job: newJob,
+      sourceReference: newRef,
       analysis,
       match,
-      adapterName: ingestResult.adapterName
+      adapterName: ingestResult.adapterName,
+      possibleDuplicates: dedupEval.possibleDuplicates
     };
   }
 
@@ -720,6 +909,9 @@ export class InMemoryCareerRepository implements ICareerRepository {
 
     const key = `${candidateId}:${jobId}`;
     const existing = this.candidateJobStates.get(key);
+    const prevStatus: CandidateJobStatus = existing ? existing.status : 'UNSEEN';
+    this.previousJobStates.set(key, prevStatus);
+
     const now = new Date();
 
     if (!existing) {
@@ -778,6 +970,54 @@ export class InMemoryCareerRepository implements ICareerRepository {
     return JSON.parse(JSON.stringify(updated));
   }
 
+  async undoCandidateJobState(
+    jobId: string,
+    candidateId: string,
+    targetPreviousState?: CandidateJobStatus
+  ): Promise<CandidateJobState | null> {
+    if (!candidateId) {
+      throw new Error('candidateId is mandatory for undoCandidateJobState');
+    }
+
+    const key = `${candidateId}:${jobId}`;
+    const existing = this.candidateJobStates.get(key);
+
+    if (!existing || existing.status !== 'DISMISSED') {
+      return existing ? JSON.parse(JSON.stringify(existing)) : null;
+    }
+
+    const target = targetPreviousState || this.previousJobStates.get(key) || 'UNSEEN';
+
+    if (target === 'UNSEEN') {
+      this.candidateJobStates.delete(key);
+      this.previousJobStates.delete(key);
+      return null;
+    }
+
+    if (target === 'SAVED') {
+      const now = new Date();
+      existing.status = 'SAVED';
+      existing.savedAt = now;
+      existing.dismissedAt = null;
+      existing.dismissedReason = null;
+      existing.updatedAt = now;
+      this.previousJobStates.set(key, 'SAVED');
+      return JSON.parse(JSON.stringify(existing));
+    }
+
+    if (target === 'VIEWED') {
+      const now = new Date();
+      existing.status = 'VIEWED';
+      existing.dismissedAt = null;
+      existing.dismissedReason = null;
+      existing.updatedAt = now;
+      this.previousJobStates.set(key, 'VIEWED');
+      return JSON.parse(JSON.stringify(existing));
+    }
+
+    return JSON.parse(JSON.stringify(existing));
+  }
+
   async getSavedSearches(candidateId: string): Promise<SavedSearch[]> {
     if (!candidateId) {
       throw new Error('candidateId is mandatory for getSavedSearches');
@@ -797,9 +1037,10 @@ export class InMemoryCareerRepository implements ICareerRepository {
   }
 
   async saveSavedSearch(
-    search: Omit<SavedSearch, 'id' | 'createdAt' | 'updatedAt' | 'candidateId'> & {
+    search: Partial<Omit<SavedSearch, 'id' | 'createdAt' | 'updatedAt' | 'candidateId'>> & {
       id?: string;
       candidateId?: string;
+      name?: string;
     },
     candidateId: string
   ): Promise<SavedSearch> {
@@ -817,9 +1058,40 @@ export class InMemoryCareerRepository implements ICareerRepository {
         throw new Error(`Saved search ${search.id} not found or access denied`);
       }
       const existing = this.savedSearches[idx];
+
+      // Optimistic concurrency check
+      if (search.filterVersion && search.filterVersion !== existing.filterVersion) {
+        throw new Error(
+          `Concurrency conflict: Saved search version ${search.filterVersion} does not match current version ${existing.filterVersion}`
+        );
+      }
+
+      const definitionChanged =
+        (search.name !== undefined && search.name !== existing.name) ||
+        (search.query !== undefined && search.query !== existing.query) ||
+        (search.locations !== undefined &&
+          JSON.stringify(search.locations) !== JSON.stringify(existing.locations)) ||
+        (search.workArrangements !== undefined &&
+          JSON.stringify(search.workArrangements) !== JSON.stringify(existing.workArrangements)) ||
+        (search.roleCategories !== undefined &&
+          JSON.stringify(search.roleCategories) !== JSON.stringify(existing.roleCategories)) ||
+        (search.seniorityLevels !== undefined &&
+          JSON.stringify(search.seniorityLevels) !== JSON.stringify(existing.seniorityLevels)) ||
+        (search.minSalary !== undefined && search.minSalary !== existing.minSalary) ||
+        (search.currency !== undefined && search.currency !== existing.currency) ||
+        (search.alertFrequency !== undefined &&
+          search.alertFrequency !== existing.alertFrequency) ||
+        (search.minMatchScore !== undefined && search.minMatchScore !== existing.minMatchScore);
+
+      let nextVersion = existing.filterVersion;
+      if (definitionChanged) {
+        const currentVerNum = parseFloat(existing.filterVersion) || 1.0;
+        nextVersion = (Math.round((currentVerNum + 0.1) * 10) / 10).toFixed(1);
+      }
+
       const updated: SavedSearch = {
         ...existing,
-        name: search.name,
+        name: search.name !== undefined ? search.name : existing.name,
         query: search.query || null,
         locations: search.locations || [],
         workArrangements: search.workArrangements || [],
@@ -828,9 +1100,15 @@ export class InMemoryCareerRepository implements ICareerRepository {
         minSalary: search.minSalary || null,
         currency: search.currency || null,
         alertFrequency: search.alertFrequency || 'weekly',
-        filterVersion: search.filterVersion || '1.0',
-        lastExecutedAt: search.lastExecutedAt ? new Date(search.lastExecutedAt) : null,
-        lastMatchCount: search.lastMatchCount || 0,
+        filterVersion: nextVersion,
+        isEnabled: search.isEnabled !== undefined ? search.isEnabled : existing.isEnabled,
+        minMatchScore:
+          search.minMatchScore !== undefined ? search.minMatchScore : existing.minMatchScore,
+        lastExecutedAt: search.lastExecutedAt
+          ? new Date(search.lastExecutedAt)
+          : existing.lastExecutedAt,
+        lastMatchCount:
+          search.lastMatchCount !== undefined ? search.lastMatchCount : existing.lastMatchCount,
         updatedAt: now
       };
       this.savedSearches[idx] = updated;
@@ -840,7 +1118,7 @@ export class InMemoryCareerRepository implements ICareerRepository {
     const created: SavedSearch = {
       id: `ss-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       candidateId,
-      name: search.name,
+      name: search.name || 'Untitled Saved Search',
       query: search.query || null,
       locations: search.locations || [],
       workArrangements: search.workArrangements || [],
@@ -850,6 +1128,8 @@ export class InMemoryCareerRepository implements ICareerRepository {
       currency: search.currency || null,
       alertFrequency: search.alertFrequency || 'weekly',
       filterVersion: search.filterVersion || '1.0',
+      isEnabled: search.isEnabled !== undefined ? search.isEnabled : true,
+      minMatchScore: search.minMatchScore || null,
       lastExecutedAt: search.lastExecutedAt ? new Date(search.lastExecutedAt) : null,
       lastMatchCount: search.lastMatchCount || 0,
       createdAt: now,
@@ -857,6 +1137,40 @@ export class InMemoryCareerRepository implements ICareerRepository {
     };
     this.savedSearches.push(created);
     return JSON.parse(JSON.stringify(created));
+  }
+
+  async enableSavedSearch(id: string, candidateId: string): Promise<SavedSearch> {
+    if (!candidateId) {
+      throw new Error('candidateId is mandatory for enableSavedSearch');
+    }
+    const idx = this.savedSearches.findIndex((s) => s.id === id && s.candidateId === candidateId);
+    if (idx === -1) {
+      throw new Error(`Saved search ${id} not found or access denied`);
+    }
+    const updated: SavedSearch = {
+      ...this.savedSearches[idx],
+      isEnabled: true,
+      updatedAt: new Date()
+    };
+    this.savedSearches[idx] = updated;
+    return JSON.parse(JSON.stringify(updated));
+  }
+
+  async disableSavedSearch(id: string, candidateId: string): Promise<SavedSearch> {
+    if (!candidateId) {
+      throw new Error('candidateId is mandatory for disableSavedSearch');
+    }
+    const idx = this.savedSearches.findIndex((s) => s.id === id && s.candidateId === candidateId);
+    if (idx === -1) {
+      throw new Error(`Saved search ${id} not found or access denied`);
+    }
+    const updated: SavedSearch = {
+      ...this.savedSearches[idx],
+      isEnabled: false,
+      updatedAt: new Date()
+    };
+    this.savedSearches[idx] = updated;
+    return JSON.parse(JSON.stringify(updated));
   }
 
   async deleteSavedSearch(id: string, candidateId: string): Promise<boolean> {
@@ -867,6 +1181,536 @@ export class InMemoryCareerRepository implements ICareerRepository {
     if (idx === -1) return false;
     this.savedSearches.splice(idx, 1);
     return true;
+  }
+
+  async getEnabledSavedSearches(frequency?: string, candidateId?: string): Promise<SavedSearch[]> {
+    return JSON.parse(
+      JSON.stringify(
+        this.savedSearches.filter(
+          (s) =>
+            s.isEnabled !== false &&
+            (!frequency || s.alertFrequency === frequency) &&
+            (!candidateId || s.candidateId === candidateId)
+        )
+      )
+    );
+  }
+
+  // --- Phase 7E: Alerts & In-App Notifications ---
+
+  async getSavedSearchAlerts(
+    candidateId: string,
+    savedSearchId?: string
+  ): Promise<SavedSearchAlert[]> {
+    if (!candidateId) {
+      throw new Error('candidateId is mandatory for getSavedSearchAlerts');
+    }
+    const alerts = this.savedSearchAlerts
+      .filter(
+        (a) =>
+          a.candidateId === candidateId && (!savedSearchId || a.savedSearchId === savedSearchId)
+      )
+      .toSorted((a, b) => new Date(b.generatedAt).getTime() - new Date(a.generatedAt).getTime());
+    return JSON.parse(JSON.stringify(alerts));
+  }
+
+  async createSavedSearchAlertAndNotification(params: {
+    candidateId: string;
+    savedSearchId: string;
+    jobId: string;
+    savedSearchVersion: string;
+    notificationTitle: string;
+    notificationMessage: string;
+    generatedAt?: Date;
+  }): Promise<{
+    alert: SavedSearchAlert | null;
+    notification: CandidateNotification | null;
+    isNew: boolean;
+  }> {
+    const {
+      candidateId,
+      savedSearchId,
+      jobId,
+      savedSearchVersion,
+      notificationTitle,
+      notificationMessage,
+      generatedAt
+    } = params;
+
+    if (!candidateId || !savedSearchId || !jobId) {
+      throw new Error(
+        'candidateId, savedSearchId, and jobId are required for createSavedSearchAlert'
+      );
+    }
+
+    // Atomic deduplication check: [candidateId, savedSearchId, jobId]
+    const existingAlert = this.savedSearchAlerts.find(
+      (a) => a.candidateId === candidateId && a.savedSearchId === savedSearchId && a.jobId === jobId
+    );
+
+    if (existingAlert) {
+      return {
+        alert: JSON.parse(JSON.stringify(existingAlert)),
+        notification: null,
+        isNew: false
+      };
+    }
+
+    const now = generatedAt || new Date();
+    const newAlert: SavedSearchAlert = {
+      id: `ssa-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      candidateId,
+      savedSearchId,
+      jobId,
+      savedSearchVersion,
+      status: 'generated',
+      generatedAt: now,
+      deliveredAt: null
+    };
+    this.savedSearchAlerts.push(newAlert);
+
+    const newNotification: CandidateNotification = {
+      id: `notif-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      candidateId,
+      type: 'SAVED_SEARCH_ALERT',
+      title: notificationTitle,
+      message: notificationMessage,
+      relatedJobId: jobId,
+      relatedSavedSearchId: savedSearchId,
+      readAt: null,
+      createdAt: now
+    };
+    this.candidateNotifications.push(newNotification);
+
+    return {
+      alert: JSON.parse(JSON.stringify(newAlert)),
+      notification: JSON.parse(JSON.stringify(newNotification)),
+      isNew: true
+    };
+  }
+
+  async getNotifications(candidateId: string): Promise<CandidateNotification[]> {
+    if (!candidateId) {
+      throw new Error('candidateId is mandatory for getNotifications');
+    }
+    const notifs = this.candidateNotifications
+      .filter((n) => n.candidateId === candidateId)
+      .toSorted((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return JSON.parse(JSON.stringify(notifs));
+  }
+
+  async markNotificationAsRead(id: string, candidateId: string): Promise<boolean> {
+    if (!candidateId) {
+      throw new Error('candidateId is mandatory for markNotificationAsRead');
+    }
+    const idx = this.candidateNotifications.findIndex(
+      (n) => n.id === id && n.candidateId === candidateId
+    );
+    if (idx === -1) {
+      return false;
+    }
+    this.candidateNotifications[idx] = {
+      ...this.candidateNotifications[idx],
+      readAt: new Date()
+    };
+    return true;
+  }
+
+  // --- Phase 7C: Deduplication & Source Intelligence ---
+
+  async findDuplicateCandidates(
+    company: string,
+    title?: string,
+    candidateId?: string
+  ): Promise<Job[]> {
+    const normCompany = normalizeCompany(company);
+    const candId = candidateId || this.db.candidate.id;
+
+    // Filter candidate-private vs public jobs:
+    // Candidate isolation: Only return jobs that are either public OR imported by the requesting candidate
+    return this.db.jobs
+      .filter((j) => {
+        const isAccessible = j.isPublic || j.importedByCandidateId === candId;
+        if (!isAccessible) return false;
+
+        const jCompanyNorm = normalizeCompany(j.company);
+        return (
+          jCompanyNorm.includes(normCompany) ||
+          normCompany.includes(jCompanyNorm) ||
+          j.company.toLowerCase() === company.toLowerCase()
+        );
+      })
+      .map((j) => JSON.parse(JSON.stringify(j)));
+  }
+
+  async updateJobDuplicateGroup(jobId: string, duplicateGroupId: string): Promise<void> {
+    const job = this.db.jobs.find((j) => j.id === jobId);
+    if (job) {
+      job.duplicateGroupId = duplicateGroupId;
+    }
+  }
+
+  async updateJobStatus(jobId: string, jobStatus: string): Promise<void> {
+    const job = this.db.jobs.find((j) => j.id === jobId);
+    if (job) {
+      job.jobStatus = jobStatus as Job['jobStatus'];
+    }
+  }
+
+  async updateJobSourceReference(
+    id: string,
+    updates: Partial<
+      Pick<
+        JobSourceReference,
+        | 'sourceStatus'
+        | 'verificationStatus'
+        | 'lastVerifiedAt'
+        | 'lastVerificationError'
+        | 'isPrimary'
+        | 'referenceRole'
+        | 'lastSeenAt'
+      >
+    >
+  ): Promise<JobSourceReference> {
+    const ref = this.jobSourceReferences.find((r) => r.id === id);
+    if (!ref) {
+      throw new Error(`Job source reference ${id} not found`);
+    }
+
+    if (updates.isPrimary) {
+      for (const r of this.jobSourceReferences) {
+        if (r.jobId === ref.jobId && r.id !== id && r.isPrimary) {
+          r.isPrimary = false;
+          r.referenceRole = 'alternative';
+          r.updatedAt = new Date();
+        }
+      }
+    }
+
+    if (updates.sourceStatus !== undefined) ref.sourceStatus = updates.sourceStatus;
+    if (updates.verificationStatus !== undefined)
+      ref.verificationStatus = updates.verificationStatus;
+    if (updates.lastVerifiedAt !== undefined)
+      ref.lastVerifiedAt = updates.lastVerifiedAt ? new Date(updates.lastVerifiedAt) : null;
+    if (updates.lastVerificationError !== undefined)
+      ref.lastVerificationError = updates.lastVerificationError;
+    if (updates.isPrimary !== undefined) ref.isPrimary = updates.isPrimary;
+    if (updates.referenceRole !== undefined) ref.referenceRole = updates.referenceRole;
+    if (updates.lastSeenAt !== undefined) ref.lastSeenAt = new Date(updates.lastSeenAt);
+    ref.updatedAt = new Date();
+
+    // Check aggregate job status if sourceStatus changed
+    if (updates.sourceStatus) {
+      const allRefs = this.jobSourceReferences.filter((r) => r.jobId === ref.jobId);
+      const job = this.db.jobs.find((j) => j.id === ref.jobId);
+      if (job) {
+        const newStatus = aggregateJobStatus(allRefs, job.jobStatus);
+        if (newStatus !== job.jobStatus) {
+          job.jobStatus = newStatus;
+        }
+      }
+    }
+
+    return JSON.parse(JSON.stringify(ref));
+  }
+
+  async fallbackPrimarySource(jobId: string): Promise<JobSourceReference | null> {
+    const allRefs = this.jobSourceReferences.filter((r) => r.jobId === jobId);
+    if (allRefs.length === 0) return null;
+
+    const best = selectBestPrimarySource(allRefs);
+    const job = this.db.jobs.find((j) => j.id === jobId);
+
+    if (!best) {
+      if (job) {
+        const newStatus = aggregateJobStatus(allRefs, job.jobStatus);
+        if (newStatus !== job.jobStatus) {
+          job.jobStatus = newStatus;
+        }
+      }
+      return null;
+    }
+
+    if (best.isPrimary) {
+      return JSON.parse(JSON.stringify(best));
+    }
+
+    for (const r of this.jobSourceReferences) {
+      if (r.jobId === jobId && r.isPrimary) {
+        r.isPrimary = false;
+        r.referenceRole = 'alternative';
+        r.updatedAt = new Date();
+      }
+    }
+
+    best.isPrimary = true;
+    best.referenceRole = 'primary';
+    best.updatedAt = new Date();
+
+    if (job) {
+      const newStatus = aggregateJobStatus(allRefs, job.jobStatus);
+      if (newStatus !== job.jobStatus) {
+        job.jobStatus = newStatus;
+      }
+    }
+
+    return JSON.parse(JSON.stringify(best));
+  }
+
+  // --- Phase 7D: Opportunity Priority & Discovery Ranking ---
+
+  async getDiscoveryRanking(
+    params: DiscoveryRankingParams,
+    candidateId: string
+  ): Promise<DiscoveryRankingResponse> {
+    const candId = candidateId || this.db.candidate.id;
+
+    const pageSize = Math.min(
+      Math.max(1, params.pageSize || DEFAULT_DISCOVERY_PAGE_SIZE),
+      MAX_DISCOVERY_PAGE_SIZE
+    );
+
+    // 1. Fetch Candidate Preferences for context and fit calculation
+    const preferences = await this.getCandidatePreferences(candId);
+
+    const filterParts: string[] = [];
+    if (params.tab) filterParts.push(`t:${params.tab}`);
+    if (params.search && params.search.trim()) filterParts.push(`q:${params.search.trim()}`);
+    if (params.workArrangement && params.workArrangement !== 'all')
+      filterParts.push(`w:${params.workArrangement}`);
+    if (params.source && params.source !== 'all') filterParts.push(`s:${params.source}`);
+    if (params.minMatch !== undefined && params.minMatch !== null)
+      filterParts.push(`m:${params.minMatch}`);
+    if (params.stateFilter && params.stateFilter !== 'all')
+      filterParts.push(`st:${params.stateFilter}`);
+    if (params.includeDismissed) filterParts.push('id:1');
+    if (params.sort && params.sort !== 'priority') filterParts.push(`sort:${params.sort}`);
+
+    const filterContext = filterParts.length > 0 ? filterParts.join(';') : undefined;
+
+    const rankingContextKey = buildRankingContextKey(
+      candId,
+      preferences,
+      DEFAULT_RANKING_CONFIG.version,
+      filterContext
+    );
+
+    // 2. Decode & validate cursor if provided
+    let cursorPayload: DiscoveryRankingCursorPayload | null = null;
+    let cursorReset = false;
+
+    if (params.cursor) {
+      const decoded = decodeCursor(params.cursor, rankingContextKey);
+      if (decoded.isContextMismatch) {
+        cursorReset = true;
+        cursorPayload = null;
+      } else if (decoded.error) {
+        throw new Error(`Invalid pagination cursor: ${decoded.error}`);
+      } else {
+        cursorPayload = decoded.payload;
+      }
+    }
+
+    // 3. Candidate isolation & active jobs filter
+    const jobs = this.db.jobs.filter((j) => {
+      if (j.isPublic === false && j.importedByCandidateId !== candId) return false;
+
+      const status = j.jobStatus || 'active';
+      if (status !== 'active') return false;
+
+      if (params.workArrangement && params.workArrangement !== 'all') {
+        if (j.workArrangement !== params.workArrangement) return false;
+      }
+
+      return true;
+    });
+
+    // 4. Evaluation Time Snapshot & Usability Gate
+    // If a cursor is present, reuse its evaluatedAt timestamp so that freshness scores remain
+    // strictly stable across pagination pages. Otherwise establish one server-side evaluation time.
+    const evaluationDate = cursorPayload ? new Date(cursorPayload.e) : new Date();
+    const evaluatedAtIso = evaluationDate.toISOString();
+
+    const eligibleOpportunities: RankedOpportunity[] = [];
+
+    for (const job of jobs) {
+      const sources = this.jobSourceReferences.filter((r) => r.jobId === job.id);
+      const hasUsableSource = sources.some((s) => isSourceUsable(s, evaluationDate));
+
+      const match =
+        this.db.matches.find((m) => m.jobId === job.id && m.candidateId === candId) || null;
+      const primarySource = sources.find((s) => s.isPrimary) || sources[0] || null;
+      const candidateState = this.candidateJobStates.get(`${candId}:${job.id}`) || null;
+      const app = this.db.applications.find((a) => a.jobId === job.id && a.candidateId === candId);
+      const applicationStatus = app ? app.status : null;
+
+      // Tab semantics
+      const tab = params.tab || 'recommended';
+      if (tab === 'saved') {
+        if (candidateState?.status !== 'SAVED') {
+          continue;
+        }
+      } else if (tab === 'recommended') {
+        // Exclude DISMISSED by default
+        if (!params.includeDismissed && candidateState?.status === 'DISMISSED') {
+          continue;
+        }
+        // Exclude without usable sources
+        if (!hasUsableSource) {
+          continue;
+        }
+      }
+
+      // Explicit state filter
+      if (params.stateFilter && params.stateFilter !== 'all') {
+        if (params.stateFilter === 'saved' && candidateState?.status !== 'SAVED') continue;
+        if (params.stateFilter === 'dismissed' && candidateState?.status !== 'DISMISSED') continue;
+        if (params.stateFilter === 'viewed' && candidateState?.status !== 'VIEWED') continue;
+        if (params.stateFilter === 'unseen' && candidateState && candidateState.status !== 'UNSEEN')
+          continue;
+      }
+
+      // Minimum Match Score filter (JobMatch.score, NOT Preference Fit!)
+      if (params.minMatch !== undefined && params.minMatch !== null && params.minMatch > 0) {
+        const matchScore = match?.score ?? 0;
+        if (matchScore < params.minMatch) {
+          continue;
+        }
+      }
+
+      // Source filter
+      if (params.source && params.source.trim() && params.source !== 'all') {
+        const sourceQuery = params.source.toLowerCase().trim();
+        const hasMatchingSource = sources.some(
+          (s) =>
+            s.source.toLowerCase() === sourceQuery ||
+            (s.sourceUrl && s.sourceUrl.toLowerCase().includes(sourceQuery))
+        );
+        if (!hasMatchingSource) {
+          continue;
+        }
+      }
+
+      // Deterministic search matching across normalized fields (title, company, location, skills)
+      if (params.search && params.search.trim()) {
+        const q = params.search.toLowerCase().trim();
+        const inTitle = job.title.toLowerCase().includes(q);
+        const inCompany = job.company.toLowerCase().includes(q);
+        const inLocation = (job.location || '').toLowerCase().includes(q);
+        const inDesc = (job.description || '').toLowerCase().includes(q);
+        const inSkills =
+          (job.requiredSkills || []).some((s) => s.toLowerCase().includes(q)) ||
+          (job.preferredSkills || []).some((s) => s.toLowerCase().includes(q));
+        if (!inTitle && !inCompany && !inLocation && !inSkills && !inDesc) {
+          continue;
+        }
+      }
+
+      const priority = calculateOpportunityPriority(
+        job,
+        candId,
+        match,
+        preferences,
+        sources,
+        DEFAULT_RANKING_CONFIG,
+        evaluationDate
+      );
+
+      eligibleOpportunities.push({
+        job: JSON.parse(JSON.stringify(job)),
+        priority,
+        match: match ? JSON.parse(JSON.stringify(match)) : null,
+        primarySource: primarySource ? JSON.parse(JSON.stringify(primarySource)) : null,
+        candidateState: candidateState ? JSON.parse(JSON.stringify(candidateState)) : null,
+        applicationStatus
+      });
+    }
+
+    // 5. Canonical Deterministic Discovery Ordering:
+    // Recommended MUST always use Opportunity Priority
+    const effectiveSort =
+      params.tab === 'recommended' || !params.tab ? 'priority' : params.sort || 'priority';
+
+    let sorted: RankedOpportunity[];
+    if (effectiveSort === 'match_desc') {
+      sorted = eligibleOpportunities.toSorted((a, b) => {
+        const aMatch = a.match?.score ?? 0;
+        const bMatch = b.match?.score ?? 0;
+        if (bMatch !== aMatch) return bMatch - aMatch;
+        return compareDiscoveryOrder(
+          { priorityScore: a.priority.priorityScore, postedDate: a.job.postedDate, id: a.job.id },
+          { priorityScore: b.priority.priorityScore, postedDate: b.job.postedDate, id: b.job.id }
+        );
+      });
+    } else if (effectiveSort === 'recent') {
+      sorted = eligibleOpportunities.toSorted((a, b) => {
+        const aDate = a.job.postedDate ? new Date(a.job.postedDate).getTime() : 0;
+        const bDate = b.job.postedDate ? new Date(b.job.postedDate).getTime() : 0;
+        if (bDate !== aDate) return bDate - aDate;
+        return compareDiscoveryOrder(
+          { priorityScore: a.priority.priorityScore, postedDate: a.job.postedDate, id: a.job.id },
+          { priorityScore: b.priority.priorityScore, postedDate: b.job.postedDate, id: b.job.id }
+        );
+      });
+    } else {
+      // 1. Priority DESC
+      // 2. postedDate DESC NULLS LAST
+      // 3. id ASC
+      sorted = eligibleOpportunities.toSorted((a, b) =>
+        compareDiscoveryOrder(
+          { priorityScore: a.priority.priorityScore, postedDate: a.job.postedDate, id: a.job.id },
+          { priorityScore: b.priority.priorityScore, postedDate: b.job.postedDate, id: b.job.id }
+        )
+      );
+    }
+
+    // 6. Keyset filtering strictly after cursor
+    let filteredItems = sorted;
+    if (cursorPayload) {
+      if (effectiveSort === 'priority') {
+        filteredItems = sorted.filter((item) =>
+          isRowAfterCursor(
+            {
+              priorityScore: item.priority.priorityScore,
+              postedDate: item.job.postedDate,
+              id: item.job.id
+            },
+            cursorPayload!
+          )
+        );
+      } else {
+        const cursorIdx = sorted.findIndex((item) => item.job.id === cursorPayload!.i);
+        if (cursorIdx >= 0) {
+          filteredItems = sorted.slice(cursorIdx + 1);
+        }
+      }
+    }
+
+    // 7. Keyset pagination slice
+    const pageItems = filteredItems.slice(0, pageSize);
+    const hasMore = filteredItems.length > pageSize;
+
+    let nextCursor: string | null = null;
+    if (hasMore && pageItems.length > 0) {
+      const lastItem = pageItems[pageItems.length - 1];
+      nextCursor = encodeCursor({
+        p: lastItem.priority.priorityScore,
+        d: lastItem.job.postedDate ? new Date(lastItem.job.postedDate).toISOString() : null,
+        i: lastItem.job.id,
+        ctx: rankingContextKey,
+        e: evaluatedAtIso
+      });
+    }
+
+    return {
+      items: pageItems,
+      nextCursor,
+      hasMore,
+      totalEligible: sorted.length,
+      rankingContextKey,
+      evaluatedAt: evaluatedAtIso,
+      cursorReset: cursorReset ? true : undefined
+    };
   }
 
   // --- Candidate Knowledge Bank & Provenance ---
@@ -1203,7 +2047,11 @@ export class InMemoryCareerRepository implements ICareerRepository {
       (b) => b.candidateId !== candidateId
     );
 
-    // Phase 7 discovery cleanup
+    // Phase 7 discovery & Phase 7E alerts cleanup
+    this.candidateNotifications = this.candidateNotifications.filter(
+      (n) => n.candidateId !== candidateId
+    );
+    this.savedSearchAlerts = this.savedSearchAlerts.filter((a) => a.candidateId !== candidateId);
     this.savedSearches = this.savedSearches.filter((s) => s.candidateId !== candidateId);
     for (const [key] of this.candidateJobStates.entries()) {
       if (key.startsWith(`${candidateId}:`)) {

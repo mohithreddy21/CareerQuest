@@ -18,6 +18,19 @@ const globalForRepo = globalThis as unknown as {
  * 3. Allows deterministic offline test suites and regression scripts to explicitly select InMemoryCareerRepository.
  */
 export function getCareerRepository(mode?: 'prisma' | 'in-memory'): ICareerRepository {
+  // STRICT GUARDRAIL: InMemory repository is strictly forbidden in production environments.
+  if (process.env.NODE_ENV === 'production') {
+    if (mode === 'in-memory' || globalForRepo.forcedRepositoryMode === 'in-memory') {
+      throw new Error(
+        'SECURITY VIOLATION: InMemoryCareerRepository is strictly forbidden in production environments.'
+      );
+    }
+    if (!globalForRepo.prismaCareerRepository) {
+      globalForRepo.prismaCareerRepository = new PrismaCareerRepository();
+    }
+    return globalForRepo.prismaCareerRepository;
+  }
+
   const selectedMode =
     mode ||
     globalForRepo.forcedRepositoryMode ||
@@ -42,6 +55,11 @@ export function getCareerRepository(mode?: 'prisma' | 'in-memory'): ICareerRepos
  * Sets repository mode programmatically for test execution
  */
 export function setCareerRepositoryMode(mode: 'prisma' | 'in-memory'): void {
+  if (process.env.NODE_ENV === 'production' && mode === 'in-memory') {
+    throw new Error(
+      'SECURITY VIOLATION: setCareerRepositoryMode("in-memory") is strictly forbidden in production environments.'
+    );
+  }
   globalForRepo.forcedRepositoryMode = mode;
 }
 

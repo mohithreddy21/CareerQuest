@@ -36,6 +36,7 @@ export interface KnowledgeItemDialogProps {
   onOpenChange: (open: boolean) => void;
   editingItem?: KnowledgeItem | null;
   defaultCategory?: KnowledgeCategory;
+  defaultSkillCategory?: 'technical' | 'tools' | 'soft' | 'other';
   onSave: (category: KnowledgeCategory, content: Record<string, unknown>, itemId?: string) => void;
   isSaving?: boolean;
 }
@@ -43,6 +44,7 @@ export interface KnowledgeItemDialogProps {
 interface InnerFormProps {
   editingItem?: KnowledgeItem | null;
   defaultCategory: KnowledgeCategory;
+  defaultSkillCategory?: 'technical' | 'tools' | 'soft' | 'other';
   onSave: (category: KnowledgeCategory, content: Record<string, unknown>, itemId?: string) => void;
   onClose: () => void;
   isSaving: boolean;
@@ -51,6 +53,7 @@ interface InnerFormProps {
 function KnowledgeItemForm({
   editingItem,
   defaultCategory,
+  defaultSkillCategory,
   onSave,
   onClose,
   isSaving
@@ -63,7 +66,7 @@ function KnowledgeItemForm({
     editingItem?.category === 'skill' ? (editingItem.content as SkillKnowledgeContent) : null;
   const [skillName, setSkillName] = useState(skillContent?.name || '');
   const [skillCategory, setSkillCategory] = useState<'technical' | 'tools' | 'soft' | 'other'>(
-    skillContent?.category || 'technical'
+    skillContent?.category || defaultSkillCategory || 'technical'
   );
   const [skillYears, setSkillYears] = useState(skillContent?.yearsOfExperience?.toString() || '');
   const [skillProficiency, setSkillProficiency] = useState<
@@ -578,6 +581,7 @@ export function KnowledgeItemDialog({
   onOpenChange,
   editingItem,
   defaultCategory = 'skill',
+  defaultSkillCategory,
   onSave,
   isSaving = false
 }: KnowledgeItemDialogProps) {
@@ -586,9 +590,10 @@ export function KnowledgeItemDialog({
       <DialogContent className='max-w-md max-h-[90vh] overflow-y-auto sm:max-w-lg'>
         {open && (
           <KnowledgeItemForm
-            key={editingItem?.id || `new-${defaultCategory}`}
+            key={editingItem?.id || `new-${defaultCategory}-${defaultSkillCategory || 'default'}`}
             editingItem={editingItem}
             defaultCategory={defaultCategory}
+            defaultSkillCategory={defaultSkillCategory}
             onSave={onSave}
             onClose={() => onOpenChange(false)}
             isSaving={isSaving}

@@ -9,6 +9,9 @@ import { Separator } from '@/components/ui/separator';
 import { NotificationCard } from '@/components/ui/notification-card';
 import { useNotificationStore } from '../utils/store';
 import { useRouter } from 'next/navigation';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { notificationsQueryOptions, notificationKeys } from '@/features/jobs/api/queries';
+import { markNotificationReadAction } from '@/features/jobs/api/saved-search-actions';
 
 const MAX_VISIBLE = 5;
 
@@ -19,10 +22,59 @@ const actionRoutes: Record<string, string> = {
 };
 
 export function NotificationCenter() {
-  const { notifications, markAsRead, markAllAsRead, unreadCount } = useNotificationStore();
+  const {
+    notifications: storeNotifs,
+    markAsRead: markStoreAsRead,
+    markAllAsRead
+  } = useNotificationStore();
   const router = useRouter();
-  const count = unreadCount();
-  const visibleNotifications = notifications.slice(0, MAX_VISIBLE);
+  const queryClient = useQueryClient();
+
+  const { data: serverNotifs = [] } = useQuery({
+    ...notificationsQueryOptions()
+  });
+
+  const markServerReadMutation = useMutation({
+    mutationFn: (id: string) => markNotificationReadAction(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: notificationKeys.all });
+    }
+  });
+
+  const formattedServerNotifs = serverNotifs.map((sn) => ({
+    id: sn.id,
+    title: sn.title,
+    body: sn.message,
+    status: (sn.readAt ? 'read' : 'unread') as 'read' | 'unread',
+    createdAt: new Date(sn.createdAt).toISOString(),
+    actions: sn.relatedJobId
+      ? [
+          {
+            id: 'view-job',
+            label: 'View job',
+            type: 'redirect' as const,
+            style: 'primary' as const
+          }
+        ]
+      : undefined
+  }));
+
+  // Merge server notifications with demo/store notifications (server notifications first)
+  const combinedNotifications = [
+    ...formattedServerNotifs,
+    ...storeNotifs.filter((n) => !formattedServerNotifs.some((sn) => sn.id === n.id))
+  ];
+
+  const unreadList = combinedNotifications.filter((n) => n.status === 'unread');
+  const count = unreadList.length;
+  const visibleNotifications = combinedNotifications.slice(0, MAX_VISIBLE);
+
+  const handleMarkAsRead = (id: string) => {
+    markStoreAsRead(id);
+    if (serverNotifs.some((sn) => sn.id === id)) {
+      markServerReadMutation.mutate(id);
+    }
+  };
 
   return (
     <Popover>
@@ -61,7 +113,7 @@ export function NotificationCenter() {
         </div>
         <Separator />
         <ScrollArea className='h-[400px]'>
-          {notifications.length === 0 ? (
+          {visibleNotifications.length === 0 ? (
             <div className='flex flex-col items-center justify-center py-12'>
               <Icons.notification className='text-muted-foreground/40 mb-2 h-8 w-8' />
               <p className='text-muted-foreground text-sm'>No notifications yet</p>
@@ -77,11 +129,11 @@ export function NotificationCenter() {
                   status={notification.status}
                   createdAt={notification.createdAt}
                   actions={notification.actions}
-                  onMarkAsRead={markAsRead}
+                  onMarkAsRead={handleMarkAsRead}
                   onAction={(notifId, actionId) => {
                     const route = actionRoutes[actionId];
                     if (route) {
-                      markAsRead(notifId);
+                      handleMarkAsRead(notifId);
                       router.push(route);
                     }
                   }}

@@ -33,6 +33,15 @@ export const DocumentService = {
     const storage = getStorage();
     const repository = getCareerRepository();
 
+    // 2.5 Duplicate detection for candidate
+    const existingDocs = await repository.getCandidateDocuments(candidateId);
+    const duplicate = existingDocs.find((d) => d.hash === validated.hash);
+    if (duplicate) {
+      throw new Error(
+        `Duplicate resume content: You have already uploaded this document as "${duplicate.filename}".`
+      );
+    }
+
     // 3. Store object in object storage
     await storage.put(storageKey, validated.buffer, validated.mimeType);
 
