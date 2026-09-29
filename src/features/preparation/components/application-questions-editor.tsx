@@ -3,6 +3,7 @@ import { GroundedApplicationQuestion } from '@/types/preparation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog,
@@ -125,40 +126,16 @@ export function ApplicationQuestionsEditor({
                       {q.category}
                     </Badge>
                     {isMissingEvidence ? (
-                      <Badge
-                        variant='outline'
-                        className='text-[10px] text-amber-600 border-amber-500/40 bg-amber-50 dark:bg-amber-950/30 dark:text-amber-300'
-                      >
-                        Missing Evidence
-                      </Badge>
+                      <StatusBadge status='warning' size='sm' label='Missing Evidence' />
                     ) : q.grounded ? (
-                      <Badge
-                        variant='outline'
-                        className='text-[10px] text-emerald-600 border-emerald-500/40 bg-emerald-50 dark:bg-emerald-950/30 dark:text-emerald-300'
-                      >
-                        Verified Knowledge
-                      </Badge>
+                      <StatusBadge status='verified' size='sm' label='Verified Knowledge' />
                     ) : (
-                      <Badge
-                        variant='outline'
-                        className='text-[10px] text-amber-600 border-amber-500/40 bg-amber-50 dark:bg-amber-950/30 dark:text-amber-300'
-                      >
-                        Requires Review
-                      </Badge>
+                      <StatusBadge status='review' size='sm' label='Requires Review' />
                     )}
                     {isCustom && (
-                      <Badge
-                        variant='outline'
-                        className='text-[10px] text-primary border-primary/40'
-                      >
-                        Candidate Customized
-                      </Badge>
+                      <StatusBadge status='customized' size='sm' label='Candidate Customized' />
                     )}
-                    {q.reviewed && (
-                      <span className='inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400'>
-                        <Icons.check className='h-3 w-3' /> Reviewed
-                      </span>
-                    )}
+                    {q.reviewed && <StatusBadge status='verified' size='sm' label='Reviewed' />}
                   </div>
                   <h4 className='font-semibold text-xs text-foreground leading-snug'>
                     {q.question}

@@ -1,0 +1,12 @@
+[     213ms] Error: Minified React error #418; visit https://react.dev/errors/418?args[]=HTML&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings.
+    at rY (http://localhost:3001/_next/static/chunks/22bhj1h92go3_.js:1:40429)
+    at iu (http://localhost:3001/_next/static/chunks/22bhj1h92go3_.js:1:91470)
+    at sd (http://localhost:3001/_next/static/chunks/22bhj1h92go3_.js:1:132160)
+    at http://localhost:3001/_next/static/chunks/22bhj1h92go3_.js:1:132005
+    at sf (http://localhost:3001/_next/static/chunks/22bhj1h92go3_.js:1:132013)
+    at se (http://localhost:3001/_next/static/chunks/22bhj1h92go3_.js:1:127153)
+    at sQ (http://localhost:3001/_next/static/chunks/22bhj1h92go3_.js:1:153832)
+    at sV (http://localhost:3001/_next/static/chunks/22bhj1h92go3_.js:1:152046)
+    at sS (http://localhost:3001/_next/static/chunks/22bhj1h92go3_.js:1:149692)
+    at http://localhost:3001/_next/static/chunks/22bhj1h92go3_.js:1:147118
+[     439ms] [WARNING] Clerk: Clerk has been loaded with development keys. Development instances have strict usage limits and should not be used when deploying your application to production. Learn more: https://clerk.com/docs/deployments/overview @ https://amazed-starling-1712.clerk.accounts.dev/npm/@clerk/clerk-js@6/dist/clerk.browser.js:37

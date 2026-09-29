@@ -1,0 +1,97 @@
+- generic [active] [ref=f6e1]:
+  - region "Notifications alt+T"
+  - generic [ref=f6e2]:
+    - link "Skip to content" [ref=f6e3] [cursor=pointer]:
+      - /url: "#main-content"
+    - generic [ref=f6e6]:
+      - generic [ref=f6e12]:
+        - generic [ref=f6e13]:
+          - generic [ref=f6e14]: Overview
+          - list [ref=f6e15]:
+            - listitem [ref=f6e16]:
+              - link "Dashboard" [ref=f6e17] [cursor=pointer]:
+                - /url: /dashboard/overview
+            - listitem [ref=f6e23]:
+              - link "Discover Jobs" [ref=f6e24] [cursor=pointer]:
+                - /url: /dashboard/discover
+            - listitem [ref=f6e28]:
+              - link "Applications" [ref=f6e29] [cursor=pointer]:
+                - /url: /dashboard/applications
+            - listitem [ref=f6e33]:
+              - link "Resume & Profile" [ref=f6e34] [cursor=pointer]:
+                - /url: /dashboard/resume
+        - generic [ref=f6e38]:
+          - generic [ref=f6e39]: Preferences
+          - list [ref=f6e40]:
+            - listitem [ref=f6e41]:
+              - link "Settings" [ref=f6e42] [cursor=pointer]:
+                - /url: /dashboard/settings
+      - list [ref=f6e47]:
+        - listitem [ref=f6e48]:
+          - button "CA Candidate Workspace" [ref=f6e49]:
+            - generic [ref=f6e50]:
+              - generic [ref=f6e51]: CA
+              - generic: Candidate Workspace
+      - button "Toggle Sidebar" [ref=f6e56]
+    - main [ref=f6e57]:
+      - generic [ref=f6e58]:
+        - generic [ref=f6e59]:
+          - button "Toggle Sidebar" [ref=f6e60]
+          - separator [ref=f6e62]
+          - navigation "breadcrumb" [ref=f6e63]:
+            - list [ref=f6e64]:
+              - listitem [ref=f6e65]:
+                - link "Dashboard" [ref=f6e66] [cursor=pointer]:
+                  - /url: /dashboard/overview
+              - listitem [aria-hidden] [ref=f6e67]
+              - link "Notifications" [disabled] [ref=f6e70]
+        - generic [ref=f6e71]:
+          - button "Search... ⌘ K" [ref=f6e74]:
+            - text: Search...
+            - generic:
+              - generic: ⌘
+              - text: K
+          - button "Toggle theme" [ref=f6e75]
+          - generic [ref=f6e78]:
+            - generic [ref=f6e79]: Theme
+            - combobox "Theme" [ref=f6e80]:
+              - generic [ref=f6e82]: Vercel
+              - generic: T T
+              - img [aria-hidden]: ▼
+            - textbox [aria-hidden] [ref=f6e83]: vercel
+          - button "Notifications" [ref=f6e84]
+      - generic [ref=f6e86]:
+        - generic [ref=f6e87]:
+          - generic [ref=f6e89]:
+            - heading "Notifications" [level=1] [ref=f6e91]
+            - paragraph [ref=f6e92]: View and manage all your notifications.
+          - generic [ref=f6e93]:
+            - tablist [ref=f6e94]:
+              - tab "All (0)" [selected] [ref=f6e95]
+              - tab "Unread (0)" [ref=f6e96]
+              - tab "Read (0)" [ref=f6e97]
+            - tabpanel "All (0)" [ref=f6e98]:
+              - generic [ref=f6e99]:
+                - heading "No notifications" [level=3] [ref=f6e104]
+                - paragraph [ref=f6e105]: You are all caught up on saved searches, new job matches, and follow-ups.
+        - generic:
+          - generic:
+            - generic:
+              - generic [ref=f6e106]:
+                - generic:
+                  - heading "Documentation" [level=2]
+                - button "Close info panel" [ref=f6e108]
+              - generic [ref=f6e110]:
+                - generic:
+                  - heading "Getting Started" [level=3]
+                  - paragraph: Learn how to get started with this application.
+                  - generic:
+                    - heading "Learn more" [level=4]
+                    - list:
+                      - listitem:
+                        - link "Installation Guide":
+                          - /url: "#"
+                          - img:
+                            - generic [ref=f6e112] [cursor=pointer]
+              - button "Toggle Infobar" [ref=f6e113]
+  - alert [ref=f6e114]

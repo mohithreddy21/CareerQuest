@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Icons } from '@/components/icons';
 import { cn } from '@/lib/utils';
 import { RankedOpportunity } from '../lib/ranking';
@@ -112,24 +113,24 @@ export function JobOpportunityCard({
       tabIndex={0}
       aria-label={`${job.title} at ${job.company}`}
       className={cn(
-        'group relative transition-all duration-200 hover:shadow-md border-border/80 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2',
+        'group relative transition-all duration-200 hover:shadow-xs border-border/80 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2',
         isDismissed && 'opacity-60 bg-muted/20',
-        isSaved && 'border-amber-500/40 bg-amber-50/20 dark:bg-amber-950/10'
+        isSaved && 'border-amber-500/40 bg-amber-50/15 dark:bg-amber-950/10'
       )}
     >
-      <CardContent className='p-5 sm:p-6 flex flex-col gap-4'>
+      <CardContent className='p-4 sm:p-5 flex flex-col gap-3.5'>
         {/* Top Meta & Badges */}
-        <div className='flex flex-wrap items-start justify-between gap-3'>
+        <div className='flex flex-wrap items-start justify-between gap-2.5'>
           <div className='space-y-1 flex-1 min-w-0'>
             <div className='flex flex-wrap items-center gap-2'>
               <Link
                 href={`/dashboard/jobs/${job.id}`}
-                className='text-base sm:text-lg font-bold text-foreground hover:text-primary hover:underline transition-colors line-clamp-1'
+                className='type-heading text-foreground hover:text-primary transition-colors line-clamp-1'
               >
                 {job.title}
               </Link>
             </div>
-            <div className='flex flex-wrap items-center gap-2 text-xs sm:text-sm text-muted-foreground'>
+            <div className='flex flex-wrap items-center gap-2 type-body-sm text-muted-foreground'>
               <span className='font-semibold text-foreground/90'>{job.company}</span>
               <span aria-hidden='true'>•</span>
               <span>{job.location || 'Location not specified'}</span>
@@ -138,85 +139,89 @@ export function JobOpportunityCard({
             </div>
           </div>
 
-          {/* Indicators / Badges */}
+          {/* Indicators / Semantic Status Badges */}
           <div className='flex flex-wrap items-center gap-1.5 shrink-0'>
-            <Badge variant='outline' className='text-xs font-medium bg-muted/40'>
+            <Badge variant='outline' className='text-[11px] font-medium bg-muted/40'>
               {sourceLabel}
             </Badge>
 
             {isClosed ? (
-              <Badge variant='destructive' className='text-xs font-semibold'>
-                Closed
-              </Badge>
+              <StatusBadge status='error' size='sm' label='Closed' />
             ) : applicationStatus ? (
-              <Badge
-                variant='secondary'
-                className='text-xs font-medium bg-primary/10 text-primary border-primary/20'
-              >
-                Applied ({applicationStatus})
-              </Badge>
+              <StatusBadge status='info' size='sm' label={`Applied (${applicationStatus})`} />
             ) : isSaved ? (
-              <Badge
-                variant='secondary'
-                className='text-xs font-medium bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30'
-              >
-                Saved
-              </Badge>
+              <StatusBadge status='warning' size='sm' label='Saved' />
             ) : candidateState?.status === 'VIEWED' ? (
-              <Badge variant='outline' className='text-xs text-muted-foreground'>
-                Viewed
-              </Badge>
+              <StatusBadge status='neutral' size='sm' label='Viewed' />
             ) : (
-              <Badge
-                variant='outline'
-                className='text-xs font-semibold text-blue-600 dark:text-blue-400 border-blue-500/30 bg-blue-500/10'
-              >
-                New
-              </Badge>
+              <StatusBadge status='customized' size='sm' label='New' />
             )}
           </div>
         </div>
 
-        {/* Scores Bar: Profile Alignment + Opportunity Priority */}
-        <div className='grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-lg bg-muted/30 border border-border/50'>
+        {/* Decision-Support Bar: Qualification Alignment & Opportunity Priority */}
+        <div className='grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 rounded-lg bg-muted/30 border border-border/60'>
           {/* Profile Alignment */}
-          <div className='flex items-center gap-3'>
-            <div className='h-10 w-10 rounded-full flex items-center justify-center bg-primary/10 text-primary font-bold text-sm shrink-0'>
-              {match ? `${match.score}%` : '—'}
-            </div>
-            <div className='min-w-0'>
-              <div className='text-xs font-medium text-muted-foreground'>Profile alignment</div>
-              <div className='text-sm font-semibold text-foreground truncate'>
-                {match ? `${match.score}% Match` : 'Evaluation pending'}
+          <div className='flex items-center gap-2.5'>
+            <div className='min-w-0 flex-1 space-y-0.5'>
+              <div className='type-caption text-muted-foreground uppercase tracking-wider font-semibold'>
+                Profile Alignment
+              </div>
+              <div className='type-body-sm font-medium text-foreground flex items-center gap-2 truncate'>
+                {match ? (
+                  <>
+                    <StatusBadge
+                      status={match.score >= 70 ? 'verified' : 'review'}
+                      size='sm'
+                      showIcon={false}
+                      label={`${match.score}% Alignment`}
+                    />
+                    <span className='type-caption text-muted-foreground capitalize'>
+                      ({match.recommendation} fit)
+                    </span>
+                  </>
+                ) : (
+                  <span className='type-caption text-muted-foreground italic'>
+                    Evaluation pending
+                  </span>
+                )}
               </div>
             </div>
           </div>
 
           {/* Opportunity Priority */}
-          <div className='flex items-center gap-3 border-t sm:border-t-0 sm:border-l border-border/60 pt-2 sm:pt-0 sm:pl-3'>
-            <div className='h-10 w-10 rounded-full flex items-center justify-center bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold text-sm shrink-0'>
-              {priority.priorityScore.toFixed(0)}
-            </div>
-            <div className='min-w-0'>
-              <div className='text-xs font-medium text-muted-foreground'>Opportunity Priority</div>
-              <div className='text-xs text-muted-foreground truncate'>
-                Fit {priority.preferenceFit.toFixed(0)} • Fresh {priority.freshness.toFixed(0)}
+          <div className='flex items-center gap-2.5 border-t sm:border-t-0 sm:border-l border-border/60 pt-2 sm:pt-0 sm:pl-3'>
+            <div className='min-w-0 flex-1 space-y-0.5'>
+              <div className='type-caption text-muted-foreground uppercase tracking-wider font-semibold'>
+                Opportunity Priority
+              </div>
+              <div className='type-body-sm font-medium text-foreground flex items-center gap-2 truncate'>
+                <Badge variant='outline' className='text-[11px] font-mono font-semibold'>
+                  Score {priority.priorityScore.toFixed(0)}
+                </Badge>
+                <span className='type-caption text-muted-foreground'>
+                  Fit {priority.breakdown.preferenceFit.toFixed(0)}% • Fresh{' '}
+                  {priority.breakdown.freshnessScore.toFixed(0)}%
+                </span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Why this is here (Factual Rationale) */}
+        {/* Why this is surfaced (Factual Rationale) */}
         {factualReasons.length > 0 && (
-          <div className='space-y-1.5 pt-0.5'>
-            <div className='text-xs font-medium text-muted-foreground flex items-center gap-1.5'>
-              <Icons.sparkles className='h-3.5 w-3.5 text-amber-500' />
+          <div className='space-y-1 pt-0.5'>
+            <div className='type-caption font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5'>
+              <Icons.sparkles className='size-3 text-amber-500' aria-hidden='true' />
               <span>Why this is surfaced:</span>
             </div>
-            <ul className='space-y-1 text-xs text-foreground/80 pl-1'>
+            <ul className='space-y-0.5 type-body-sm text-foreground/80 pl-1'>
               {factualReasons.map((reason, idx) => (
                 <li key={idx} className='flex items-center gap-2'>
-                  <span className='h-1.5 w-1.5 rounded-full bg-primary/70 shrink-0' />
+                  <span
+                    className='size-1.5 rounded-full bg-primary/70 shrink-0'
+                    aria-hidden='true'
+                  />
                   <span>{reason}</span>
                 </li>
               ))}
@@ -226,8 +231,8 @@ export function JobOpportunityCard({
 
         {/* Bottom Actions Row */}
         <div className='flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-border/60'>
-          <div className='flex items-center gap-1.5 text-xs text-muted-foreground'>
-            <Icons.calendar className='h-3.5 w-3.5' />
+          <div className='flex items-center gap-1.5 type-caption text-muted-foreground'>
+            <Icons.calendar className='size-3.5' aria-hidden='true' />
             <span>{freshnessText}</span>
           </div>
 
@@ -240,7 +245,7 @@ export function JobOpportunityCard({
               disabled={isSaving}
               onClick={() => onSave?.(job.id, candidateState?.status || null)}
               className={cn(
-                'min-h-[44px] px-3.5 text-xs font-medium transition-colors',
+                'h-8 px-3 text-xs font-medium transition-colors',
                 isSaved &&
                   'bg-amber-500/15 text-amber-700 dark:text-amber-300 hover:bg-amber-500/25 border-amber-500/30'
               )}
@@ -248,12 +253,12 @@ export function JobOpportunityCard({
             >
               {isSaved ? (
                 <>
-                  <Icons.check className='mr-1.5 h-4 w-4 text-amber-600' />
+                  <Icons.check className='mr-1.5 size-3.5 text-amber-600' />
                   Saved
                 </>
               ) : (
                 <>
-                  <Icons.star className='mr-1.5 h-4 w-4' />
+                  <Icons.star className='mr-1.5 size-3.5' />
                   Save
                 </>
               )}
@@ -266,10 +271,10 @@ export function JobOpportunityCard({
               size='sm'
               disabled={isDismissing}
               onClick={() => onDismiss?.(job.id, candidateState?.status || null)}
-              className='min-h-[44px] px-3 text-xs font-medium text-muted-foreground hover:text-destructive transition-colors'
+              className='h-8 px-2.5 text-xs font-medium text-muted-foreground hover:text-destructive transition-colors'
               aria-label={`Dismiss ${job.title}`}
             >
-              <Icons.close className='mr-1 h-3.5 w-3.5' />
+              <Icons.close className='mr-1 size-3' />
               Dismiss
             </Button>
 
@@ -278,11 +283,11 @@ export function JobOpportunityCard({
               href={`/dashboard/jobs/${job.id}`}
               className={cn(
                 buttonVariants({ variant: 'default', size: 'sm' }),
-                'min-h-[44px] px-3.5 text-xs font-medium'
+                'h-8 px-3 text-xs font-medium shadow-2xs'
               )}
             >
               Review Match
-              <Icons.chevronRight className='ml-1 h-3.5 w-3.5' />
+              <Icons.chevronRight className='ml-1 size-3' />
             </Link>
           </div>
         </div>

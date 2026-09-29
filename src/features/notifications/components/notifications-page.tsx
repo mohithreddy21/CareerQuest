@@ -3,6 +3,7 @@
 import { Icons } from '@/components/icons';
 import PageContainer from '@/components/layout/page-container';
 import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/empty-state';
 import { NotificationCard } from '@/components/ui/notification-card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useRouter } from 'next/navigation';
@@ -70,10 +71,12 @@ export default function NotificationsPage() {
   const renderList = (items: typeof notifications) => {
     if (items.length === 0) {
       return (
-        <div className='flex flex-col items-center justify-center py-16'>
-          <Icons.notification className='text-muted-foreground/40 mb-3 h-10 w-10' />
-          <p className='text-muted-foreground text-sm'>No notifications</p>
-        </div>
+        <EmptyState
+          variant='default'
+          icon={Icons.notification}
+          title='No notifications'
+          description='You are all caught up on saved searches, new job matches, and follow-ups.'
+        />
       );
     }
 

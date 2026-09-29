@@ -19,6 +19,8 @@ import { buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Icons } from '@/components/icons';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { EmptyState } from '@/components/ui/empty-state';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { APPLICATION_STAGES, APPLICATION_STATUS_LABELS, ApplicationStatus } from '@/types/domain';
@@ -104,21 +106,19 @@ export default function OverviewPage() {
   return (
     <div className='flex flex-1 flex-col gap-6 p-4 md:p-6 max-w-full overflow-hidden'>
       {/* Search Status Hero Banner */}
-      <Card className='border-border/60 bg-gradient-to-r from-card via-card/90 to-accent/20'>
-        <CardContent className='flex flex-col gap-4 p-6 md:flex-row md:items-center md:justify-between'>
+      <Card className='border-border/80 bg-card/60 shadow-xs'>
+        <CardContent className='flex flex-col gap-4 p-5 md:p-6 md:flex-row md:items-center md:justify-between'>
           <div className='space-y-1.5'>
             <div className='flex items-center gap-2'>
-              <span className='inline-flex items-center rounded-md bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary'>
-                Active Search Workspace
-              </span>
-              <span className='text-xs text-muted-foreground'>
+              <StatusBadge status='verified' size='sm' label='Active Search Workspace' />
+              <span className='type-body-sm text-muted-foreground'>
                 Targeting: {candidate.preferences.targetRoles.join(', ')}
               </span>
             </div>
-            <h1 className='text-2xl font-bold tracking-tight text-foreground md:text-3xl'>
+            <h1 className='type-display text-foreground'>
               Focus on the jobs worth your time, {candidate.name.split(' ')[0]}.
             </h1>
-            <p className='max-w-2xl text-xs sm:text-sm text-muted-foreground leading-relaxed'>
+            <p className='max-w-2xl type-body-sm text-muted-foreground leading-relaxed'>
               Your deterministic command center. Review today&apos;s actions, keep upcoming
               interviews on track, monitor application progress, and learn from outcome trends
               without losing human authority.
@@ -175,9 +175,9 @@ export default function OverviewPage() {
                   <Link
                     key={stage}
                     href={`/dashboard/applications?status=${stage}`}
-                    className='flex flex-col rounded-xl border border-border/50 p-3 transition-colors hover:border-primary/50 hover:bg-muted/40'
+                    className='flex flex-col rounded-lg border border-border/50 p-3 transition-colors hover:border-primary/50 hover:bg-muted/40'
                   >
-                    <span className='text-[11px] font-medium text-muted-foreground'>
+                    <span className='type-caption text-muted-foreground'>
                       {APPLICATION_STATUS_LABELS[stage]}
                     </span>
                     <span className='mt-1 text-2xl font-bold tracking-tight text-foreground font-mono'>
@@ -215,19 +215,18 @@ export default function OverviewPage() {
           </CardHeader>
           <CardContent className='p-4'>
             {upcomingInterviews.length === 0 ? (
-              <div className='py-6 text-center border border-dashed border-border/70 rounded-xl space-y-1'>
-                <Icons.calendar className='h-6 w-6 text-muted-foreground mx-auto opacity-50' />
-                <p className='text-xs font-medium text-foreground'>No interviews scheduled yet</p>
-                <p className='text-[11px] text-muted-foreground'>
-                  When recruiters schedule rounds, log them to track interview notes.
-                </p>
-              </div>
+              <EmptyState
+                variant='compact'
+                icon={Icons.calendar}
+                title='No interviews scheduled yet'
+                description='When recruiters schedule rounds, log them to track interview notes and follow-ups.'
+              />
             ) : (
-              <div className='space-y-3'>
+              <div className='space-y-2.5'>
                 {upcomingInterviews.map((item, idx) => (
                   <div
                     key={idx}
-                    className='flex items-center justify-between p-3 rounded-xl border border-border/70 bg-card hover:border-border transition-colors'
+                    className='flex items-center justify-between p-3 rounded-lg border border-border/70 bg-card hover:border-border transition-colors'
                   >
                     <div className='space-y-0.5'>
                       <div className='flex items-center gap-2'>
@@ -299,19 +298,18 @@ export default function OverviewPage() {
           </CardHeader>
           <CardContent className='p-4'>
             {upcomingFollowUps.length === 0 ? (
-              <div className='py-6 text-center border border-dashed border-border/70 rounded-xl space-y-1'>
-                <Icons.check className='h-6 w-6 text-emerald-500 mx-auto' />
-                <p className='text-xs font-medium text-foreground'>No pending follow-ups</p>
-                <p className='text-[11px] text-muted-foreground'>
-                  Submitting new applications automatically sets a 7-day follow-up reminder.
-                </p>
-              </div>
+              <EmptyState
+                variant='compact'
+                icon={Icons.check}
+                title='No pending follow-ups'
+                description='Submitting new applications automatically sets a 7-day follow-up reminder.'
+              />
             ) : (
-              <div className='space-y-3'>
+              <div className='space-y-2.5'>
                 {upcomingFollowUps.map((item, idx) => (
                   <div
                     key={idx}
-                    className='flex items-center justify-between p-3 rounded-xl border border-border/70 bg-card hover:border-border transition-colors'
+                    className='flex items-center justify-between p-3 rounded-lg border border-border/70 bg-card hover:border-border transition-colors'
                   >
                     <div className='space-y-0.5'>
                       <div className='flex items-center gap-2'>
@@ -411,12 +409,12 @@ export default function OverviewPage() {
                       </h4>
                       <p className='text-[11px] text-muted-foreground font-medium'>{job.company}</p>
                     </div>
-                    <Badge
-                      variant='outline'
-                      className='text-[10px] font-mono bg-primary/5 text-primary border-primary/20 shrink-0'
-                    >
-                      {match.score}% match
-                    </Badge>
+                    <StatusBadge
+                      status='verified'
+                      size='sm'
+                      showIcon={false}
+                      label={`Match: ${match.score}%`}
+                    />
                   </div>
                   <p className='text-[11px] text-muted-foreground line-clamp-2 leading-relaxed'>
                     {match.headline}

@@ -179,7 +179,7 @@ export default function ResumeTailorWorkspace({ jobId }: { jobId: string }) {
             <Icons.circleCheck className='mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400' />
             <div className='space-y-0.5'>
               <p className='font-semibold text-foreground'>
-                100% Grounded in your approved Candidate Knowledge Bank
+                Grounded in your approved Knowledge Bank
               </p>
               <p className='leading-relaxed text-[11px]'>
                 Every suggested modification is anchored to verified skills, projects, and
@@ -293,15 +293,33 @@ export default function ResumeTailorWorkspace({ jobId }: { jobId: string }) {
                 </span>
               </div>
 
-              {resume.changes.map((change) => (
-                <ResumeChangeCard
-                  key={change.id}
-                  change={change}
-                  onUpdateStatus={handleUpdateStatus}
-                  onOpenEdit={handleOpenEdit}
-                  isUpdating={changeStatusMutation.isPending}
-                />
-              ))}
+              {resume.changes.length === 0 ? (
+                <Card className='border-dashed p-8 text-center'>
+                  <div className='flex flex-col items-center justify-center space-y-3'>
+                    <div className='rounded-full bg-muted p-3'>
+                      <Icons.fileTypeDoc className='h-6 w-6 text-muted-foreground' />
+                    </div>
+                    <div className='space-y-1 max-w-md'>
+                      <p className='text-sm font-semibold'>No tailoring revisions proposed yet</p>
+                      <p className='text-xs text-muted-foreground'>
+                        All master resume statements currently align with this role, or the dynamic
+                        tailoring service deferred proposals. You can inspect your grounded master
+                        resume in the Live Preview tab.
+                      </p>
+                    </div>
+                  </div>
+                </Card>
+              ) : (
+                resume.changes.map((change) => (
+                  <ResumeChangeCard
+                    key={change.id}
+                    change={change}
+                    onUpdateStatus={handleUpdateStatus}
+                    onOpenEdit={handleOpenEdit}
+                    isUpdating={changeStatusMutation.isPending}
+                  />
+                ))
+              )}
 
               {/* Bottom Applications Handoff Bar */}
               <div className='flex items-center justify-between pt-4 border-t border-border/60'>

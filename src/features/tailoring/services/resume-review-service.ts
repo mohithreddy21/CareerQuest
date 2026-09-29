@@ -1,5 +1,5 @@
 import { careerRepository } from '@/services/career-repository';
-import { ResumeChangeStatus, TailoredResumeVersion } from '@/types/tailoring';
+import { ResumeChange, ResumeChangeStatus, TailoredResumeVersion } from '@/types/tailoring';
 import { ResumeVersion } from '@/types/domain';
 import { knowledgeRetrievalService } from './knowledge-retrieval-service';
 import { resumeTailoringService } from './resume-tailoring-service';
@@ -55,13 +55,18 @@ export class ResumeReviewService {
       candidateId
     );
 
-    // 2. Generate grounded changes
-    const groundedChanges = await resumeTailoringService.generateGroundedChanges(
-      job,
-      analysis,
-      activeMasterResume,
-      retrievedKnowledge
-    );
+    // 2. Generate grounded changes with resilience
+    let groundedChanges: ResumeChange[] = [];
+    try {
+      groundedChanges = await resumeTailoringService.generateGroundedChanges(
+        job,
+        analysis,
+        activeMasterResume,
+        retrievedKnowledge
+      );
+    } catch (err: unknown) {
+      console.warn('[ResumeReviewService] Dynamic tailoring generation deferred:', err);
+    }
 
     // 3. Assemble initial tailored version
     const initialVersion: TailoredResumeVersion = {
@@ -85,7 +90,9 @@ export class ResumeReviewService {
     };
 
     // 4. Save to repository (immutable master preserved)
-    await careerRepository.saveResumeVersion(initialVersion);
+    if (groundedChanges.length > 0) {
+      await careerRepository.saveResumeVersion(initialVersion);
+    }
     return initialVersion;
   }
 

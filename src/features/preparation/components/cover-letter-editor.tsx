@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Icons } from '@/components/icons';
 import { cn } from '@/lib/utils';
@@ -71,21 +72,11 @@ export function CoverLetterEditor({
               >
                 {coverLetter.status === 'reviewed' ? 'Reviewed & Ready' : 'Draft in Review'}
               </Badge>
-              {isGrounded ? (
-                <Badge
-                  variant='outline'
-                  className='text-[10px] text-emerald-600 border-emerald-500/40 bg-emerald-50 dark:bg-emerald-950/30 dark:text-emerald-300'
-                >
-                  Verified Knowledge
-                </Badge>
-              ) : (
-                <Badge
-                  variant='outline'
-                  className='text-[10px] text-amber-600 border-amber-500/40 bg-amber-50 dark:bg-amber-950/30 dark:text-amber-300'
-                >
-                  Requires Review
-                </Badge>
-              )}
+              <StatusBadge
+                status={isGrounded ? 'verified' : 'review'}
+                size='sm'
+                label={isGrounded ? 'Verified Knowledge' : 'Requires Review'}
+              />
             </div>
             <CardDescription className='text-xs'>
               Tailored narrative anchored to verified experiences in your Knowledge Bank. Never

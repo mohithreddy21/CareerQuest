@@ -1,0 +1,227 @@
+/* ==========================================================================
+   CareerQuest Design System Foundation — Phase A
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. Typography System (6-Level Hierarchy)
+   - Display: 24px (1.5rem), line-height 1.25, bold (-0.015em tracking)
+   - Heading: 18px (1.125rem), line-height 1.3, semibold (-0.01em tracking)
+   - Subheading: 14px (0.875rem), line-height 1.4, medium
+   - Body: 14px (0.875rem), line-height 1.5, regular
+   - Body Small: 12px (0.75rem), line-height 1.4, regular
+   - Caption: 11px (0.6875rem), line-height 1.3, medium
+   -------------------------------------------------------------------------- */
+
+@utility type-display {
+  font-size: 1.5rem; /* 24px */
+  line-height: 1.25;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+
+@utility type-heading {
+  font-size: 1.125rem; /* 18px */
+  line-height: 1.3;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+@utility type-subheading {
+  font-size: 0.875rem; /* 14px */
+  line-height: 1.4;
+  font-weight: 500;
+}
+
+@utility type-body {
+  font-size: 0.875rem; /* 14px */
+  line-height: 1.5;
+  font-weight: 400;
+}
+
+@utility type-body-sm {
+  font-size: 0.75rem; /* 12px */
+  line-height: 1.4;
+  font-weight: 400;
+}
+
+@utility type-caption {
+  font-size: 0.6875rem; /* 11px */
+  line-height: 1.3;
+  font-weight: 500;
+}
+
+/* --------------------------------------------------------------------------
+   2. Spacing Foundation (8pt Spacing Grid)
+   - 8px:  var(--spacing) * 2  (0.5rem)
+   - 16px: var(--spacing) * 4  (1.0rem)
+   - 24px: var(--spacing) * 6  (1.5rem)
+   - 32px: var(--spacing) * 8  (2.0rem)
+   - 40px: var(--spacing) * 10 (2.5rem)
+   - 48px: var(--spacing) * 12 (3.0rem)
+
+   Standardized Card Padding:
+   - Standard Card: 20px (1.25rem)
+   - Compact Card: 16px (1.0rem)
+   -------------------------------------------------------------------------- */
+
+@utility card-pad-standard {
+  padding: 1.25rem; /* 20px */
+}
+
+@utility card-pad-compact {
+  padding: 1rem; /* 16px */
+}
+
+/* --------------------------------------------------------------------------
+   3. Semantic Color Tokens (Light & Dark Theme Roles)
+   - Verified / Approved / Grounded: Emerald
+   - Requires Review / Flagged Claims: Amber
+   - Original Master Content / Safe Decisions: Slate / Neutral (NOT destructive red!)
+   - Active Editing / Custom Content: Indigo / Blue
+   - Genuinely Destructive: Destructive Red
+   - Informational: Sky / Blue
+   - Surfaces: Canvas, Raised Surface, Subtle Surface, Structural Borders
+   -------------------------------------------------------------------------- */
+
+:root {
+  /* Surfaces & Structural Geometry */
+  --cq-canvas: var(--background);
+  --cq-surface: var(--card);
+  --cq-surface-subtle: color-mix(in oklch, var(--muted) 45%, var(--card));
+  --cq-surface-hover: var(--muted);
+  --cq-border: var(--border);
+  --cq-border-subtle: color-mix(in oklch, var(--border) 60%, transparent);
+
+  /* Primary Action */
+  --cq-primary: var(--primary);
+  --cq-primary-foreground: var(--primary-foreground);
+
+  /* Emerald: Verified candidate facts / approved or grounded changes */
+  --cq-verified: oklch(0.6 0.16 150);
+  --cq-verified-foreground: oklch(0.99 0 0);
+  --cq-verified-subtle: oklch(0.96 0.04 150);
+  --cq-verified-border: oklch(0.85 0.08 150);
+
+  /* Amber: Unverified claims / requires candidate review */
+  --cq-review: oklch(0.7 0.16 65);
+  --cq-review-foreground: oklch(0.25 0.08 65);
+  --cq-review-subtle: oklch(0.97 0.04 70);
+  --cq-review-border: oklch(0.86 0.09 70);
+
+  /* Slate/Zinc: Original master facts / neutral status / safe decision (NOT destructive!) */
+  --cq-original: oklch(0.55 0.02 250);
+  --cq-original-foreground: oklch(0.99 0 0);
+  --cq-original-subtle: oklch(0.96 0.01 250);
+  --cq-original-border: oklch(0.88 0.01 250);
+
+  /* Indigo/Blue: Active editing / interactive selections / custom content */
+  --cq-customized: oklch(0.55 0.18 250);
+  --cq-customized-foreground: oklch(0.99 0 0);
+  --cq-customized-subtle: oklch(0.96 0.04 250);
+  --cq-customized-border: oklch(0.85 0.09 250);
+
+  /* Destructive: Reserved strictly for irreversible destructive actions */
+  --cq-danger: var(--destructive);
+  --cq-danger-foreground: var(--destructive-foreground);
+  --cq-danger-subtle: color-mix(in oklch, var(--destructive) 10%, var(--card));
+  --cq-danger-border: color-mix(in oklch, var(--destructive) 30%, var(--border));
+
+  /* Informational */
+  --cq-info: oklch(0.6 0.14 230);
+  --cq-info-foreground: oklch(0.99 0 0);
+  --cq-info-subtle: oklch(0.96 0.03 230);
+  --cq-info-border: oklch(0.85 0.07 230);
+}
+
+.dark {
+  /* Surfaces & Structural Geometry */
+  --cq-canvas: var(--background);
+  --cq-surface: var(--card);
+  --cq-surface-subtle: color-mix(in oklch, var(--muted) 45%, var(--card));
+  --cq-surface-hover: var(--muted);
+  --cq-border: var(--border);
+  --cq-border-subtle: color-mix(in oklch, var(--border) 60%, transparent);
+
+  /* Primary Action */
+  --cq-primary: var(--primary);
+  --cq-primary-foreground: var(--primary-foreground);
+
+  /* Emerald: Verified candidate facts / approved or grounded changes */
+  --cq-verified: oklch(0.68 0.17 150);
+  --cq-verified-foreground: oklch(0.12 0.05 150);
+  --cq-verified-subtle: oklch(0.22 0.06 150 / 0.35);
+  --cq-verified-border: oklch(0.38 0.09 150 / 0.5);
+
+  /* Amber: Unverified claims / requires candidate review */
+  --cq-review: oklch(0.78 0.16 70);
+  --cq-review-foreground: oklch(0.18 0.06 70);
+  --cq-review-subtle: oklch(0.25 0.07 70 / 0.35);
+  --cq-review-border: oklch(0.42 0.1 70 / 0.5);
+
+  /* Slate/Zinc: Original master facts / neutral status / safe decision (NOT destructive!) */
+  --cq-original: oklch(0.7 0.02 250);
+  --cq-original-foreground: oklch(0.15 0.01 250);
+  --cq-original-subtle: oklch(0.22 0.01 250 / 0.35);
+  --cq-original-border: oklch(0.35 0.01 250 / 0.5);
+
+  /* Indigo/Blue: Active editing / interactive selections / custom content */
+  --cq-customized: oklch(0.65 0.18 250);
+  --cq-customized-foreground: oklch(0.12 0.05 250);
+  --cq-customized-subtle: oklch(0.24 0.07 250 / 0.35);
+  --cq-customized-border: oklch(0.4 0.1 250 / 0.5);
+
+  /* Destructive: Reserved strictly for irreversible destructive actions */
+  --cq-danger: var(--destructive);
+  --cq-danger-foreground: var(--destructive-foreground);
+  --cq-danger-subtle: color-mix(in oklch, var(--destructive) 15%, var(--card));
+  --cq-danger-border: color-mix(in oklch, var(--destructive) 35%, var(--border));
+
+  /* Informational */
+  --cq-info: oklch(0.7 0.14 230);
+  --cq-info-foreground: oklch(0.15 0.04 230);
+  --cq-info-subtle: oklch(0.24 0.05 230 / 0.35);
+  --cq-info-border: oklch(0.38 0.08 230 / 0.5);
+}
+
+/* --------------------------------------------------------------------------
+   4. Tailwind Utility Tokens Mapping
+   -------------------------------------------------------------------------- */
+
+@theme inline {
+  --color-cq-canvas: var(--cq-canvas);
+  --color-cq-surface: var(--cq-surface);
+  --color-cq-surface-subtle: var(--cq-surface-subtle);
+  --color-cq-surface-hover: var(--cq-surface-hover);
+  --color-cq-border: var(--cq-border);
+  --color-cq-border-subtle: var(--cq-border-subtle);
+
+  --color-cq-verified: var(--cq-verified);
+  --color-cq-verified-foreground: var(--cq-verified-foreground);
+  --color-cq-verified-subtle: var(--cq-verified-subtle);
+  --color-cq-verified-border: var(--cq-verified-border);
+
+  --color-cq-review: var(--cq-review);
+  --color-cq-review-foreground: var(--cq-review-foreground);
+  --color-cq-review-subtle: var(--cq-review-subtle);
+  --color-cq-review-border: var(--cq-review-border);
+
+  --color-cq-original: var(--cq-original);
+  --color-cq-original-foreground: var(--cq-original-foreground);
+  --color-cq-original-subtle: var(--cq-original-subtle);
+  --color-cq-original-border: var(--cq-original-border);
+
+  --color-cq-customized: var(--cq-customized);
+  --color-cq-customized-foreground: var(--cq-customized-foreground);
+  --color-cq-customized-subtle: var(--cq-customized-subtle);
+  --color-cq-customized-border: var(--cq-customized-border);
+
+  --color-cq-danger: var(--cq-danger);
+  --color-cq-danger-foreground: var(--cq-danger-foreground);
+  --color-cq-danger-subtle: var(--cq-danger-subtle);
+  --color-cq-danger-border: var(--cq-danger-border);
+
+  --color-cq-info: var(--cq-info);
+  --color-cq-info-foreground: var(--cq-info-foreground);
+  --color-cq-info-subtle: var(--cq-info-subtle);
+  --color-cq-info-border: var(--cq-info-border);
+}

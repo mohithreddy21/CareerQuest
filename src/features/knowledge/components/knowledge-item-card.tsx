@@ -20,6 +20,7 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
 import { Icons } from '@/components/icons';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { ProvenancePopover } from './provenance-popover';
 import { cn } from '@/lib/utils';
 
@@ -76,15 +77,12 @@ export function KnowledgeItemCard({
                 {item.category}
               </Badge>
               {item.status === 'approved' && (
-                <span className='inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400'>
-                  <Icons.circleCheck className='h-3 w-3' /> Verified
-                </span>
+                <StatusBadge status='verified' size='sm' label='Approved' />
               )}
-              {isArchived && (
-                <Badge variant='secondary' className='text-[10px] text-muted-foreground'>
-                  Archived
-                </Badge>
+              {item.status === 'proposed' && (
+                <StatusBadge status='review' size='sm' label='Proposed' />
               )}
+              {isArchived && <StatusBadge status='original' size='sm' label='Archived' />}
             </div>
             <h3 className='text-sm font-semibold text-foreground tracking-tight truncate'>
               {getTitle()}

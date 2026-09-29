@@ -15,6 +15,7 @@ import { SavedSearchesDialog } from './saved-searches-dialog';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Select,
@@ -487,74 +488,42 @@ export default function DiscoverPage() {
             </div>
           )}
         </div>
+      ) : /* Meaningful Empty States per Tab */
+      tab === 'recommended' ? (
+        <EmptyState
+          variant='dashed'
+          icon={Icons.sparkles}
+          title='No recommended opportunities yet'
+          description='Try importing a job from a custom URL, expanding your search filters, or updating your role preferences.'
+          secondaryAction={
+            hasActiveFilters ? { label: 'Reset Filters', onClick: clearAllFilters } : undefined
+          }
+        >
+          <div className='flex justify-center pt-2'>
+            <JobImportDialog />
+          </div>
+        </EmptyState>
+      ) : tab === 'saved' ? (
+        <EmptyState
+          variant='dashed'
+          icon={Icons.star}
+          title="You haven't saved any jobs yet"
+          description='Click "Save" on any opportunity card to keep track of it here.'
+          primaryAction={{
+            label: 'Browse Recommended Jobs',
+            onClick: () => setTab('recommended')
+          }}
+        />
       ) : (
-        /* Meaningful Empty States per Tab */
-        <div className='flex flex-col items-center justify-center py-16 px-4 rounded-xl border border-dashed text-center bg-card/40'>
-          {tab === 'recommended' ? (
-            <>
-              <Icons.sparkles className='h-10 w-10 text-muted-foreground/50 mb-3' />
-              <h3 className='text-base font-semibold text-foreground'>
-                No recommended opportunities yet
-              </h3>
-              <p className='text-xs text-muted-foreground max-w-sm mt-1.5 leading-relaxed'>
-                Try importing a job from a custom URL, expanding your search filters, or updating
-                your role preferences.
-              </p>
-              <div className='flex items-center gap-2 mt-5'>
-                <JobImportDialog />
-                {hasActiveFilters && (
-                  <Button
-                    variant='outline'
-                    size='sm'
-                    onClick={clearAllFilters}
-                    className='h-9 text-xs'
-                  >
-                    Reset Filters
-                  </Button>
-                )}
-              </div>
-            </>
-          ) : tab === 'saved' ? (
-            <>
-              <Icons.star className='h-10 w-10 text-amber-500/50 mb-3' />
-              <h3 className='text-base font-semibold text-foreground'>
-                You haven&apos;t saved any jobs yet
-              </h3>
-              <p className='text-xs text-muted-foreground max-w-sm mt-1.5 leading-relaxed'>
-                Click &ldquo;Save&rdquo; on any opportunity card to keep track of it here.
-              </p>
-              <Button
-                variant='outline'
-                size='sm'
-                onClick={() => setTab('recommended')}
-                className='mt-5 h-9 text-xs'
-              >
-                Browse Recommended Jobs
-              </Button>
-            </>
-          ) : (
-            <>
-              <Icons.search className='h-10 w-10 text-muted-foreground/50 mb-3' />
-              <h3 className='text-base font-semibold text-foreground'>
-                No jobs match these filters
-              </h3>
-              <p className='text-xs text-muted-foreground max-w-sm mt-1.5 leading-relaxed'>
-                Try adjusting your search query, clearing arrangements, or lowering the minimum
-                alignment threshold.
-              </p>
-              {hasActiveFilters && (
-                <Button
-                  variant='outline'
-                  size='sm'
-                  onClick={clearAllFilters}
-                  className='mt-5 h-9 text-xs'
-                >
-                  Clear All Filters
-                </Button>
-              )}
-            </>
-          )}
-        </div>
+        <EmptyState
+          variant='dashed'
+          icon={Icons.search}
+          title='No jobs match these filters'
+          description='Try adjusting your search query, clearing arrangements, or lowering the minimum alignment threshold.'
+          primaryAction={
+            hasActiveFilters ? { label: 'Clear All Filters', onClick: clearAllFilters } : undefined
+          }
+        />
       )}
     </div>
   );

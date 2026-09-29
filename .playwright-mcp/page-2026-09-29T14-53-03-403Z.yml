@@ -1,0 +1,102 @@
+- generic [active] [ref=f7e1]:
+  - region "Notifications alt+T"
+  - generic [ref=f7e2]:
+    - link "Skip to content" [ref=f7e3] [cursor=pointer]:
+      - /url: "#main-content"
+    - main [ref=f7e4]:
+      - generic [ref=f7e5]:
+        - generic [ref=f7e6]:
+          - button "Toggle Sidebar" [ref=f7e7]
+          - separator [ref=f7e9]
+          - navigation "breadcrumb" [ref=f7e10]:
+            - list [ref=f7e11]:
+              - link "Settings" [disabled] [ref=f7e12]
+        - generic [ref=f7e13]:
+          - button "Toggle theme" [ref=f7e14]
+          - button "Notifications" [ref=f7e16]
+      - generic [ref=f7e19]:
+        - generic [ref=f7e21]:
+          - heading "Settings" [level=1] [ref=f7e23]
+          - paragraph [ref=f7e24]: Job search parameters, AI preferences, and privacy controls.
+        - generic [ref=f7e25]:
+          - generic [ref=f7e26]:
+            - heading "Settings & Search Preferences" [level=1] [ref=f7e27]
+            - paragraph [ref=f7e28]: Configure your target job filters, AI assistance behavior, and career privacy preferences.
+          - generic [ref=f7e29]:
+            - generic [ref=f7e30]:
+              - generic [ref=f7e31]: Job Search Targets
+              - generic [ref=f7e32]: These parameters drive the match scoring and recommendations on your dashboard.
+            - generic [ref=f7e33]:
+              - generic [ref=f7e34]:
+                - text: Target Roles (Comma-separated)
+                - textbox "Target Roles (Comma-separated)" [ref=f7e35]:
+                  - /placeholder: e.g. Senior Full-Stack Engineer, Staff Engineer
+                  - text: Software Development Engineer 1, Full Stack Developer
+              - generic [ref=f7e36]:
+                - text: Preferred Locations (Comma-separated)
+                - textbox "Preferred Locations (Comma-separated)" [ref=f7e37]:
+                  - /placeholder: e.g. San Francisco, CA, Remote, New York, NY
+              - generic [ref=f7e38]:
+                - text: Minimum Annual Salary Target (USD)
+                - spinbutton "Minimum Annual Salary Target (USD)" [ref=f7e39]
+          - generic [ref=f7e40]:
+            - generic [ref=f7e41]:
+              - generic [ref=f7e42]: AI Assistance Preferences
+              - generic [ref=f7e43]: Configure how CareerQuest analyzes postings and formulates resume revisions.
+            - generic [ref=f7e44]:
+              - generic [ref=f7e45]:
+                - generic [ref=f7e46]:
+                  - text: Automatic Requirement Extraction
+                  - paragraph [ref=f7e47]: Automatically parse responsibilities and requirements when importing any URL.
+                - switch "Automatic Requirement Extraction" [checked] [ref=f7e48]
+                - checkbox [checked] [aria-hidden] [ref=f7e49]
+              - generic [ref=f7e50]:
+                - generic [ref=f7e51]:
+                  - text: Highlight High-Match Opportunities
+                  - paragraph [ref=f7e52]: Highlight roles with 90%+ match scores on the dashboard overview.
+                - switch "Highlight High-Match Opportunities" [checked] [ref=f7e53]
+                - checkbox [checked] [aria-hidden] [ref=f7e54]
+          - generic [ref=f7e55]:
+            - generic [ref=f7e56]:
+              - generic [ref=f7e57]: Privacy & Data Controls
+              - generic [ref=f7e58]: Your candidate information is treated as private career intelligence.
+            - generic [ref=f7e59]:
+              - generic [ref=f7e60]:
+                - generic [ref=f7e61]:
+                  - text: Strict Privacy Mode
+                  - paragraph [ref=f7e62]: Keep profile strictly local and client-isolated during AI analyses.
+                - switch "Strict Privacy Mode" [checked] [ref=f7e63]
+                - checkbox [checked] [aria-hidden] [ref=f7e64]
+              - generic [ref=f7e65]:
+                - paragraph [ref=f7e66]: Truthfulness Guarantee
+                - paragraph [ref=f7e67]: CareerQuest will never fabricate credentials, skills, or job history. Generated content is always traceable to candidate-entered source evidence.
+          - button "Save Preferences" [ref=f7e69]
+          - generic [ref=f7e70]:
+            - generic [ref=f7e71]:
+              - generic [ref=f7e72]:
+                - generic [ref=f7e73]: Uploaded Source Documents
+                - generic [ref=f7e74]: Resumes and career documents used as source material for your Knowledge Bank.
+              - button "Upload Document" [ref=f7e76]
+            - generic [ref=f7e78]:
+              - generic [ref=f7e80]:
+                - generic [ref=f7e85]:
+                  - paragraph [ref=f7e86]: AILURI_MOHITH_REDDY_SAP_.pdf
+                  - paragraph [ref=f7e87]: 238.2 KB • Uploaded 9/28/2026
+                - generic [ref=f7e88]:
+                  - generic [ref=f7e89]: uploaded
+                  - link "Download" [ref=f7e90] [cursor=pointer]:
+                    - /url: /api/documents/cmukmm8m80013u48knxu2hykt
+                  - button "Delete Document" [ref=f7e95]
+              - generic [ref=f7e97]:
+                - paragraph [ref=f7e98]: Document vs Knowledge Lifecycle
+                - paragraph [ref=f7e99]: Deleting an uploaded document permanently removes the file. Any approved items in your Knowledge Bank derived from this document remain active, and their source provenance will truthfully reflect that the source document is no longer stored.
+          - generic [ref=f7e100]:
+            - generic [ref=f7e101]:
+              - generic [ref=f7e102]: Delete Account & Workspace Data
+              - generic [ref=f7e103]: Permanently destroy your candidate workspace, applications, documents, and career knowledge.
+            - generic [ref=f7e104]:
+              - generic [ref=f7e105]:
+                - generic [ref=f7e106]: Irreversible Workspace Deletion
+                - paragraph [ref=f7e110]: This will permanently purge your candidate profile, search preferences, approved Knowledge Bank items, all uploaded resumes, tailored resume versions, and application tracking pipeline records. Public jobs will not be deleted.
+              - button "Delete CareerQuest Data" [ref=f7e112]
+  - alert [ref=f7e114]

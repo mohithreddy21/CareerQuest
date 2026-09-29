@@ -15,8 +15,8 @@ import {
   SelectValue
 } from '@/components/ui/select';
 import { Icons } from '@/components/icons';
-import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { EmptyState } from '@/components/ui/empty-state';
 import { cn } from '@/lib/utils';
 import { APPLICATION_STAGES, APPLICATION_STATUS_LABELS } from '@/types/domain';
 import Link from 'next/link';
@@ -153,7 +153,7 @@ export default function ApplicationsPage() {
       </div>
 
       {/* Filter Bar */}
-      <div className='flex flex-wrap items-center gap-2.5 p-3 rounded-xl bg-card border border-border/70 shadow-xs'>
+      <div className='flex flex-wrap items-center gap-2.5 p-3 rounded-lg bg-card border border-border/80 shadow-xs'>
         {/* Search */}
         <div className='relative flex-1 min-w-[200px]'>
           <Icons.search className='absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground' />
@@ -262,46 +262,33 @@ export default function ApplicationsPage() {
 
       {/* Main Content Area */}
       {applications.length === 0 ? (
-        <Card className='p-12 text-center'>
-          <div className='flex flex-col items-center justify-center gap-3'>
-            <Icons.kanban className='h-10 w-10 text-muted-foreground opacity-50' />
-            <h2 className='text-base font-semibold text-foreground'>No applications tracked yet</h2>
-            <p className='text-xs text-muted-foreground max-w-md'>
-              Explore recommended opportunities, tailor your resume to job requirements, and track
-              your active application pipeline here.
-            </p>
-            <Link
-              href='/dashboard/discover'
-              className={cn(buttonVariants({ size: 'sm' }), 'text-xs mt-2 gap-1.5')}
-            >
-              <Icons.search className='h-3.5 w-3.5' /> Discover Opportunities
-            </Link>
-          </div>
-        </Card>
+        <EmptyState
+          variant='card'
+          icon={Icons.kanban}
+          title='No applications tracked yet'
+          description='Explore recommended opportunities, tailor your resume to job requirements, and track your active application pipeline here.'
+          primaryAction={{
+            label: 'Discover Opportunities',
+            href: '/dashboard/discover',
+            icon: Icons.search
+          }}
+        />
       ) : filteredApplications.length === 0 ? (
-        <Card className='p-12 text-center'>
-          <div className='flex flex-col items-center justify-center gap-3'>
-            <Icons.kanban className='h-10 w-10 text-muted-foreground opacity-50' />
-            <h2 className='text-base font-semibold text-foreground'>
-              No matching applications found
-            </h2>
-            <p className='text-xs text-muted-foreground max-w-md'>
-              Try adjusting your search query or stage filters to see your tracked applications.
-            </p>
-            <button
-              type='button'
-              onClick={() => {
-                setSearchQuery('');
-                setStatusFilter('all');
-                setFollowUpFilter('all');
-                setSourceFilter('all');
-              }}
-              className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'text-xs mt-1')}
-            >
-              Clear All Filters
-            </button>
-          </div>
-        </Card>
+        <EmptyState
+          variant='card'
+          icon={Icons.kanban}
+          title='No matching applications found'
+          description='Try adjusting your search query or stage filters to see your tracked opportunities.'
+          primaryAction={{
+            label: 'Clear All Filters',
+            onClick: () => {
+              setSearchQuery('');
+              setStatusFilter('all');
+              setFollowUpFilter('all');
+              setSourceFilter('all');
+            }
+          }}
+        />
       ) : viewMode === 'pipeline' ? (
         <ApplicationsKanban applications={filteredApplications} />
       ) : (

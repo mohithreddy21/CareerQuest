@@ -1,0 +1,239 @@
+- generic [active] [ref=f4e1]:
+  - region "Notifications alt+T"
+  - generic [ref=f4e2]:
+    - link "Skip to content" [ref=f4e3] [cursor=pointer]:
+      - /url: "#main-content"
+    - generic [ref=f4e6]:
+      - generic [ref=f4e12]:
+        - generic [ref=f4e13]:
+          - generic [ref=f4e14]: Overview
+          - list [ref=f4e15]:
+            - listitem [ref=f4e16]:
+              - link "Dashboard" [ref=f4e17] [cursor=pointer]:
+                - /url: /dashboard/overview
+            - listitem [ref=f4e23]:
+              - link "Discover Jobs" [ref=f4e24] [cursor=pointer]:
+                - /url: /dashboard/discover
+            - listitem [ref=f4e28]:
+              - link "Applications" [ref=f4e29] [cursor=pointer]:
+                - /url: /dashboard/applications
+            - listitem [ref=f4e33]:
+              - link "Resume & Profile" [ref=f4e34] [cursor=pointer]:
+                - /url: /dashboard/resume
+        - generic [ref=f4e38]:
+          - generic [ref=f4e39]: Preferences
+          - list [ref=f4e40]:
+            - listitem [ref=f4e41]:
+              - link "Settings" [ref=f4e42] [cursor=pointer]:
+                - /url: /dashboard/settings
+      - list [ref=f4e47]:
+        - listitem [ref=f4e48]:
+          - button "CA Candidate Workspace" [ref=f4e49]:
+            - generic [ref=f4e50]:
+              - generic [ref=f4e51]: CA
+              - generic: Candidate Workspace
+      - button "Toggle Sidebar" [ref=f4e56]
+    - main [ref=f4e57]:
+      - generic [ref=f4e58]:
+        - generic [ref=f4e59]:
+          - button "Toggle Sidebar" [ref=f4e60]
+          - separator [ref=f4e62]
+          - navigation "breadcrumb" [ref=f4e63]:
+            - list [ref=f4e64]:
+              - listitem [ref=f4e65]:
+                - link "Dashboard" [ref=f4e66] [cursor=pointer]:
+                  - /url: /dashboard/overview
+              - listitem [aria-hidden] [ref=f4e67]
+              - link "Resume & Profile" [disabled] [ref=f4e70]
+        - generic [ref=f4e71]:
+          - button "Search... ⌘ K" [ref=f4e74]:
+            - text: Search...
+            - generic:
+              - generic: ⌘
+              - text: K
+          - button "Toggle theme" [ref=f4e75]
+          - generic [ref=f4e78]:
+            - generic [ref=f4e79]: Theme
+            - combobox "Theme" [ref=f4e80]:
+              - generic [ref=f4e82]: Vercel
+              - generic: T T
+              - img [aria-hidden]: ▼
+            - textbox [aria-hidden] [ref=f4e83]: vercel
+          - button "Notifications" [ref=f4e84]
+      - generic [ref=f4e86]:
+        - generic [ref=f4e87]:
+          - generic [ref=f4e89]:
+            - heading "Resume & Profile" [level=1] [ref=f4e91]
+            - paragraph [ref=f4e92]: Your verified professional history and source-of-truth master resume.
+          - generic [ref=f4e93]:
+            - generic [ref=f4e94]:
+              - generic [ref=f4e95]:
+                - heading "Career Assets & Knowledge" [level=1] [ref=f4e96]
+                - paragraph [ref=f4e97]: The Candidate Knowledge Bank is your persistent, verified source of career truth. Resumes are representations compiled from this knowledge.
+              - generic [ref=f4e98]:
+                - button "Upload Resume" [ref=f4e99]
+                - button "Save Profile Changes" [ref=f4e100]
+            - generic [ref=f4e101]:
+              - tablist [ref=f4e102]:
+                - tab "Profile & Identity" [selected] [ref=f4e103]
+                - tab "Knowledge Bank" [ref=f4e104]
+                - tab "Master Resume" [ref=f4e105]
+              - tabpanel [ref=f4e106]:
+                - generic [ref=f4e107]:
+                  - tablist [ref=f4e108]:
+                    - tab "Skills" [selected] [ref=f4e109]
+                    - tab "Summary" [ref=f4e110]
+                    - tab "Experience" [ref=f4e111]
+                    - tab "Education" [ref=f4e112]
+                    - tab "Projects" [ref=f4e113]
+                  - tabpanel [ref=f4e114]:
+                    - generic [ref=f4e115]:
+                      - generic [ref=f4e116]:
+                        - heading "Skills & Proficiencies" [level=2] [ref=f4e117]
+                        - paragraph [ref=f4e118]: Approved skills from your Knowledge Bank grouped by domain. These directly power AI match scoring and resume tailoring.
+                      - button "Add Skill" [ref=f4e119]
+                    - generic [ref=f4e120]:
+                      - generic [ref=f4e121]:
+                        - generic [ref=f4e122]:
+                          - generic [ref=f4e123]:
+                            - generic [ref=f4e124]: Technical Skills
+                            - generic [ref=f4e125]: 13 skills
+                          - button "Add Skill" [ref=f4e126]
+                        - generic [ref=f4e128]:
+                          - generic [ref=f4e129]:
+                            - generic [ref=f4e130]: React
+                            - generic [ref=f4e131]: (1y)
+                            - generic [ref=f4e132]: • intermediate
+                            - generic [ref=f4e133]:
+                              - button "Edit React" [ref=f4e134]
+                              - button "More options for React" [ref=f4e139]
+                          - generic [ref=f4e144]:
+                            - generic [ref=f4e145]: Python
+                            - generic [ref=f4e146]: (2y)
+                            - generic [ref=f4e147]: • intermediate
+                            - generic [ref=f4e148]:
+                              - button "Edit Python" [ref=f4e149]
+                              - button "More options for Python" [ref=f4e154]
+                          - generic [ref=f4e159]:
+                            - generic [ref=f4e160]: Advanced Business Application Programming (ABAP)
+                            - generic [ref=f4e161]:
+                              - button "Edit Advanced Business Application Programming (ABAP)" [ref=f4e162]
+                              - button "More options for Advanced Business Application Programming (ABAP)" [ref=f4e167]
+                          - generic [ref=f4e172]:
+                            - generic [ref=f4e173]: Cloud Application Development (SAP BTP)
+                            - generic [ref=f4e174]:
+                              - button "Edit Cloud Application Development (SAP BTP)" [ref=f4e175]
+                              - button "More options for Cloud Application Development (SAP BTP)" [ref=f4e180]
+                          - generic [ref=f4e185]:
+                            - generic [ref=f4e186]: Object-Oriented Design (ABAP OO)
+                            - generic [ref=f4e187]:
+                              - button "Edit Object-Oriented Design (ABAP OO)" [ref=f4e188]
+                              - button "More options for Object-Oriented Design (ABAP OO)" [ref=f4e193]
+                          - generic [ref=f4e198]:
+                            - generic [ref=f4e199]: Full Stack Development (Backend)
+                            - generic [ref=f4e200]:
+                              - button "Edit Full Stack Development (Backend)" [ref=f4e201]
+                              - button "More options for Full Stack Development (Backend)" [ref=f4e206]
+                          - generic [ref=f4e211]:
+                            - generic [ref=f4e212]: Java
+                            - generic [ref=f4e213]:
+                              - button "Edit Java" [ref=f4e214]
+                              - button "More options for Java" [ref=f4e219]
+                          - generic [ref=f4e224]:
+                            - generic [ref=f4e225]: JavaScript
+                            - generic [ref=f4e226]:
+                              - button "Edit JavaScript" [ref=f4e227]
+                              - button "More options for JavaScript" [ref=f4e232]
+                          - generic [ref=f4e237]:
+                            - generic [ref=f4e238]: C
+                            - generic [ref=f4e239]:
+                              - button "Edit C" [ref=f4e240]
+                              - button "More options for C" [ref=f4e245]
+                          - generic [ref=f4e250]:
+                            - generic [ref=f4e251]: Data Structures & Algorithms
+                            - generic [ref=f4e252]:
+                              - button "Edit Data Structures & Algorithms" [ref=f4e253]
+                              - button "More options for Data Structures & Algorithms" [ref=f4e258]
+                          - generic [ref=f4e263]:
+                            - generic [ref=f4e264]: Operating Systems
+                            - generic [ref=f4e265]:
+                              - button "Edit Operating Systems" [ref=f4e266]
+                              - button "More options for Operating Systems" [ref=f4e271]
+                          - generic [ref=f4e276]:
+                            - generic [ref=f4e277]: Computer Networks
+                            - generic [ref=f4e278]:
+                              - button "Edit Computer Networks" [ref=f4e279]
+                              - button "More options for Computer Networks" [ref=f4e284]
+                          - generic [ref=f4e289]:
+                            - generic [ref=f4e290]: DBMS
+                            - generic [ref=f4e291]:
+                              - button "Edit DBMS" [ref=f4e292]
+                              - button "More options for DBMS" [ref=f4e297]
+                      - generic [ref=f4e302]:
+                        - generic [ref=f4e303]:
+                          - generic [ref=f4e304]:
+                            - generic [ref=f4e305]: Tools & Infrastructure
+                            - generic [ref=f4e306]: 4 tools
+                          - button "Add Tool" [ref=f4e307]
+                        - generic [ref=f4e309]:
+                          - generic [ref=f4e310]:
+                            - generic [ref=f4e311]: GitHub
+                            - generic [ref=f4e312]: (2y)
+                            - generic [ref=f4e313]: • intermediate
+                            - generic [ref=f4e314]:
+                              - button "Edit GitHub" [ref=f4e315]
+                              - button "More options for GitHub" [ref=f4e320]
+                          - generic [ref=f4e325]:
+                            - generic [ref=f4e326]: Git
+                            - generic [ref=f4e327]:
+                              - button "Edit Git" [ref=f4e328]
+                              - button "More options for Git" [ref=f4e333]
+                          - generic [ref=f4e338]:
+                            - generic [ref=f4e339]: VS Code
+                            - generic [ref=f4e340]:
+                              - button "Edit VS Code" [ref=f4e341]
+                              - button "More options for VS Code" [ref=f4e346]
+                          - generic [ref=f4e351]:
+                            - generic [ref=f4e352]: Postman
+                            - generic [ref=f4e353]:
+                              - button "Edit Postman" [ref=f4e354]
+                              - button "More options for Postman" [ref=f4e359]
+                      - generic [ref=f4e364]:
+                        - generic [ref=f4e365]:
+                          - generic [ref=f4e366]:
+                            - generic [ref=f4e367]: Soft Skills & Practices
+                            - generic [ref=f4e368]: 0 practices
+                          - button "Add Practice" [ref=f4e369]
+                        - generic [ref=f4e371]:
+                          - paragraph [ref=f4e372]: No practices added yet. Add methodologies, leadership, and communication skills.
+                          - button "Add Practice" [ref=f4e373]
+                      - generic [ref=f4e374]:
+                        - generic [ref=f4e375]:
+                          - generic [ref=f4e376]:
+                            - generic [ref=f4e377]: Other Proficiencies
+                            - generic [ref=f4e378]: 0 proficiencies
+                          - button "Add Skill" [ref=f4e379]
+                        - generic [ref=f4e381]:
+                          - paragraph [ref=f4e382]: No additional skills added yet. Add domain proficiencies or specialized capabilities.
+                          - button "Add Proficiency" [ref=f4e383]
+        - generic:
+          - generic:
+            - generic:
+              - generic [ref=f4e384]:
+                - generic:
+                  - heading "Documentation" [level=2]
+                - button "Close info panel" [ref=f4e386]
+              - generic [ref=f4e388]:
+                - generic:
+                  - heading "Getting Started" [level=3]
+                  - paragraph: Learn how to get started with this application.
+                  - generic:
+                    - heading "Learn more" [level=4]
+                    - list:
+                      - listitem:
+                        - link "Installation Guide":
+                          - /url: "#"
+                          - img:
+                            - generic [ref=f4e390] [cursor=pointer]
+              - button "Toggle Infobar" [ref=f4e391]
+  - alert [ref=f4e392]
