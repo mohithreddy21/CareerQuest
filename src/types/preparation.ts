@@ -15,7 +15,14 @@ export interface GroundedCoverLetter {
   status: 'draft' | 'reviewed';
 }
 
-export type ApplicationQuestionCategory = 'interest' | 'experience' | 'technical' | 'fit';
+export type ApplicationQuestionCategory =
+  | 'behavioral'
+  | 'technical'
+  | 'motivation'
+  | 'logistics'
+  | 'compensation'
+  | 'eligibility'
+  | 'other';
 
 export interface GroundedApplicationQuestion {
   id: string;
@@ -27,6 +34,8 @@ export interface GroundedApplicationQuestion {
   evidenceReferences: string[];
   grounded: boolean;
   reviewed: boolean;
+  reviewStatus?: 'VERIFIED' | 'REQUIRES_REVIEW' | 'MISSING_EVIDENCE';
+  missingEvidenceNote?: string | null;
 }
 
 export interface ApplicationReadinessChecklistItem {

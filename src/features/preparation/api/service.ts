@@ -145,9 +145,11 @@ export async function updateCoverLetterDraft(
 
   // Grounding validation on candidate edit
   const isGrounded = applicationPreparationService.validateGrounding(
+    payload.coverLetter.body,
     payload.coverLetter.sourceKnowledgeItemIds,
     approvedKnowledge,
-    candidate.id
+    candidate.id,
+    true
   );
 
   const updatedCoverLetter: GroundedCoverLetter = {
@@ -186,10 +188,13 @@ export async function updateQuestionAnswer(
   ].filter((k) => k.status === 'approved');
 
   // Grounding validation on candidate edit
+  const textToValidate = payload.question.candidateEditedAnswer || payload.question.suggestedAnswer;
   const isGrounded = applicationPreparationService.validateGrounding(
+    textToValidate,
     payload.question.sourceKnowledgeItemIds,
     approvedKnowledge,
-    candidate.id
+    candidate.id,
+    payload.question.category === 'motivation' || payload.question.category === 'other'
   );
 
   const verifiedQuestion: GroundedApplicationQuestion = {
@@ -210,6 +215,107 @@ export async function updateQuestionAnswer(
   );
 
   return verifiedQuestion;
+}
+
+export async function regenerateCoverLetterDraft(
+  applicationId: string,
+  candidateId?: string
+): Promise<GroundedCoverLetter> {
+  const candId = candidateId || (await requireCandidateId({ redirectOnUnauthenticated: false }));
+  const application = await careerRepository.getApplicationById(applicationId, candId);
+  if (!application) throw new Error(`Application not found: ${applicationId}`);
+
+  const candidate = await careerRepository.getCandidateProfile(candId);
+  const kb = await careerRepository.getKnowledgeBank(candidate.id);
+  const approvedKnowledge = [
+    ...kb.skills,
+    ...kb.experiences,
+    ...kb.projects,
+    ...kb.education,
+    ...kb.certifications,
+    ...kb.achievements
+  ].filter((k) => k.status === 'approved');
+
+  let tailoredResume = await careerRepository.getTailoredResumeForJob(application.job.id, candId);
+  if (!tailoredResume) {
+    tailoredResume = await careerRepository.getMasterResume(candId);
+  }
+
+  const freshCoverLetter = await applicationPreparationService.regenerateCoverLetter({
+    job: application.job,
+    analysis: application.analysis,
+    approvedKnowledge,
+    tailoredResume: tailoredResume!,
+    candidate
+  });
+
+  await careerRepository.updateApplicationPreparation(
+    applicationId,
+    {
+      coverLetterData: freshCoverLetter,
+      coverLetter: freshCoverLetter.body
+    },
+    candId
+  );
+
+  return freshCoverLetter;
+}
+
+export async function regenerateQuestionAnswerDraft(
+  applicationId: string,
+  questionId: string,
+  candidateId?: string
+): Promise<GroundedApplicationQuestion> {
+  const candId = candidateId || (await requireCandidateId({ redirectOnUnauthenticated: false }));
+  const application = await careerRepository.getApplicationById(applicationId, candId);
+  if (!application) throw new Error(`Application not found: ${applicationId}`);
+
+  const existingQ = (application.preparedQuestions || []).find((q) => q.id === questionId);
+  if (!existingQ) throw new Error(`Question not found: ${questionId}`);
+
+  const candidate = await careerRepository.getCandidateProfile(candId);
+  const kb = await careerRepository.getKnowledgeBank(candidate.id);
+  const approvedKnowledge = [
+    ...kb.skills,
+    ...kb.experiences,
+    ...kb.projects,
+    ...kb.education,
+    ...kb.certifications,
+    ...kb.achievements
+  ].filter((k) => k.status === 'approved');
+
+  let tailoredResume = await careerRepository.getTailoredResumeForJob(application.job.id, candId);
+  if (!tailoredResume) {
+    tailoredResume = await careerRepository.getMasterResume(candId);
+  }
+
+  const freshAnswer = await applicationPreparationService.regenerateQuestionAnswer({
+    question: existingQ.question,
+    job: application.job,
+    analysis: application.analysis,
+    approvedKnowledge,
+    tailoredResume: tailoredResume!,
+    candidate
+  });
+
+  const mergedAnswer: GroundedApplicationQuestion = {
+    ...freshAnswer,
+    id: existingQ.id
+  };
+
+  const updatedQuestions = (application.preparedQuestions || []).map((q) =>
+    q.id === questionId ? mergedAnswer : q
+  );
+
+  await careerRepository.updateApplicationPreparation(
+    applicationId,
+    {
+      preparedQuestions: updatedQuestions
+    },
+    candId
+  );
+
+  return mergedAnswer;
 }
 
 export async function updateApplicationTemplateSelection(

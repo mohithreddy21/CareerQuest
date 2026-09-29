@@ -3,6 +3,8 @@ import { ResumeChangeStatus, TailoredResumeVersion } from '@/types/tailoring';
 import { ResumeVersion } from '@/types/domain';
 import { knowledgeRetrievalService } from './knowledge-retrieval-service';
 import { resumeTailoringService } from './resume-tailoring-service';
+import { positiveGroundingValidator } from './grounding-validator';
+import { KnowledgeItem } from '@/types/knowledge';
 
 export class ResumeReviewService {
   /**
@@ -114,6 +116,7 @@ export class ResumeReviewService {
 
   /**
    * Saves candidate's custom edits to a proposed change.
+   * Preserves provenance and validates whether custom edit is independently grounded.
    */
   async editChangeContent(
     resumeVersionId: string,
@@ -129,6 +132,39 @@ export class ResumeReviewService {
 
     change.editedContent = editedContent;
     change.status = 'edited';
+
+    // Validate if the candidate edit is independently grounded in the Knowledge Bank
+    const candId = candidateId || resume.candidateId;
+    if (candId) {
+      try {
+        const bank = await careerRepository.getKnowledgeBank(candId);
+        const candidateAllItems: KnowledgeItem[] = [
+          ...(bank.skills || []),
+          ...(bank.experiences || []),
+          ...(bank.projects || []),
+          ...(bank.education || []),
+          ...(bank.certifications || []),
+          ...(bank.achievements || [])
+        ];
+
+        const validation = positiveGroundingValidator.validateClaim({
+          proposedText: editedContent,
+          originalText: change.originalContent,
+          sourceKnowledgeItemIds: change.sourceKnowledgeItemIds || [],
+          candidateId: candId,
+          candidateApprovedKnowledge: candidateAllItems,
+          contextLabel: `Candidate edit in ${change.section}`
+        });
+
+        // Candidate edit only receives grounded label if independently verified
+        change.grounded = validation.status === 'GROUNDED';
+      } catch {
+        change.grounded = false;
+      }
+    } else {
+      change.grounded = false;
+    }
+
     resume.updatedAt = new Date().toISOString();
 
     // Re-compile resume snapshot
@@ -139,7 +175,10 @@ export class ResumeReviewService {
   }
 
   /**
-   * Approves all pending changes in a single safe operation.
+   * Approves pending changes in a single safe operation.
+   * CRITICAL SAFETY RULE: Only changes that passed domain grounding (grounded === true)
+   * can be auto-approved. Any change requiring review (grounded !== true) MUST remain
+   * pending for explicit candidate inspection.
    * Does NOT touch previously rejected changes.
    */
   async approveAllPendingChanges(
@@ -150,12 +189,12 @@ export class ResumeReviewService {
     if (!resume) throw new Error(`Resume version not found: ${resumeVersionId}`);
 
     resume.changes.forEach((c) => {
-      if (c.status === 'pending') {
+      // ONLY approve if status is pending AND change is verified grounded!
+      if (c.status === 'pending' && c.grounded === true) {
         c.status = 'approved';
       }
     });
 
-    resume.approvalState = 'approved';
     resume.updatedAt = new Date().toISOString();
 
     this.compileResumeContent(resume);
@@ -207,10 +246,12 @@ export class ResumeReviewService {
     }
 
     const allResolved = resume.changes.every(
-      (c) => c.status === 'approved' || c.status === 'edited'
+      (c) => c.status === 'approved' || c.status === 'edited' || c.status === 'rejected'
     );
     if (allResolved && resume.changes.length > 0) {
       resume.approvalState = 'approved';
+    } else {
+      resume.approvalState = 'in_review';
     }
   }
 }

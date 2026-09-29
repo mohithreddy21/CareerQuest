@@ -6,15 +6,24 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Icons } from '@/components/icons';
+import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
 export interface CoverLetterEditorProps {
   coverLetter: GroundedCoverLetter;
   onUpdate: (updated: GroundedCoverLetter) => void;
+  onRegenerate?: () => void;
   isSaving?: boolean;
+  isRegenerating?: boolean;
 }
 
-export function CoverLetterEditor({ coverLetter, onUpdate, isSaving }: CoverLetterEditorProps) {
+export function CoverLetterEditor({
+  coverLetter,
+  onUpdate,
+  onRegenerate,
+  isSaving,
+  isRegenerating
+}: CoverLetterEditorProps) {
   const [body, setBody] = useState(coverLetter.body);
   const [copied, setCopied] = useState(false);
 
@@ -47,12 +56,14 @@ export function CoverLetterEditor({ coverLetter, onUpdate, isSaving }: CoverLett
     toast.success('Cover letter draft saved.');
   };
 
+  const isGrounded = coverLetter.grounded !== false;
+
   return (
     <Card className='border-border/80 shadow-xs'>
       <CardHeader className='pb-3'>
         <div className='flex flex-wrap items-center justify-between gap-3'>
           <div className='space-y-1'>
-            <div className='flex items-center gap-2'>
+            <div className='flex items-center gap-2 flex-wrap'>
               <CardTitle className='text-base font-bold'>Grounded Cover Letter</CardTitle>
               <Badge
                 variant={coverLetter.status === 'reviewed' ? 'default' : 'secondary'}
@@ -60,6 +71,21 @@ export function CoverLetterEditor({ coverLetter, onUpdate, isSaving }: CoverLett
               >
                 {coverLetter.status === 'reviewed' ? 'Reviewed & Ready' : 'Draft in Review'}
               </Badge>
+              {isGrounded ? (
+                <Badge
+                  variant='outline'
+                  className='text-[10px] text-emerald-600 border-emerald-500/40 bg-emerald-50 dark:bg-emerald-950/30 dark:text-emerald-300'
+                >
+                  Verified Knowledge
+                </Badge>
+              ) : (
+                <Badge
+                  variant='outline'
+                  className='text-[10px] text-amber-600 border-amber-500/40 bg-amber-50 dark:bg-amber-950/30 dark:text-amber-300'
+                >
+                  Requires Review
+                </Badge>
+              )}
             </div>
             <CardDescription className='text-xs'>
               Tailored narrative anchored to verified experiences in your Knowledge Bank. Never
@@ -69,36 +95,53 @@ export function CoverLetterEditor({ coverLetter, onUpdate, isSaving }: CoverLett
 
           <div className='flex flex-wrap items-center gap-2'>
             {/* Grounding Popover */}
-            <Popover>
-              <PopoverTrigger
-                render={
-                  <Button
-                    variant='outline'
-                    size='sm'
-                    className='h-8 text-xs gap-1.5 text-emerald-600 border-emerald-500/30 hover:bg-emerald-500/10 dark:text-emerald-400'
-                  >
-                    <Icons.circleCheck className='h-3.5 w-3.5' />
-                    <span>Inspect Evidence ({coverLetter.sourceKnowledgeItemIds.length})</span>
-                  </Button>
-                }
-              />
+            {coverLetter.sourceKnowledgeItemIds?.length > 0 && (
+              <Popover>
+                <PopoverTrigger
+                  render={
+                    <Button
+                      variant='outline'
+                      size='sm'
+                      className='h-8 text-xs gap-1.5 text-emerald-600 border-emerald-500/30 hover:bg-emerald-500/10 dark:text-emerald-400'
+                    >
+                      <Icons.circleCheck className='h-3.5 w-3.5' />
+                      <span>Inspect Evidence ({coverLetter.sourceKnowledgeItemIds.length})</span>
+                    </Button>
+                  }
+                />
 
-              <PopoverContent className='w-80 text-xs p-3.5 space-y-2' align='end'>
-                <div className='font-bold text-foreground border-b border-border/60 pb-1 flex items-center gap-1.5'>
-                  <Icons.circleCheck className='h-4 w-4 text-emerald-600' />
-                  Grounded in your Knowledge Bank
-                </div>
-                <p className='text-[11px] text-muted-foreground'>
-                  The statements in this cover letter reference the following verified candidate
-                  facts:
-                </p>
-                <ul className='list-disc pl-4 space-y-1 text-[11px] text-foreground/90'>
-                  {coverLetter.evidenceReferences.map((ref, idx) => (
-                    <li key={idx}>{ref}</li>
-                  ))}
-                </ul>
-              </PopoverContent>
-            </Popover>
+                <PopoverContent className='w-80 text-xs p-3.5 space-y-2' align='end'>
+                  <div className='font-bold text-foreground border-b border-border/60 pb-1 flex items-center gap-1.5'>
+                    <Icons.circleCheck className='h-4 w-4 text-emerald-600' />
+                    Grounded in your Knowledge Bank
+                  </div>
+                  <p className='text-[11px] text-muted-foreground'>
+                    The statements in this cover letter reference the following verified candidate
+                    facts:
+                  </p>
+                  <ul className='list-disc pl-4 space-y-1 text-[11px] text-foreground/90'>
+                    {coverLetter.evidenceReferences.map((ref, idx) => (
+                      <li key={idx}>{ref}</li>
+                    ))}
+                  </ul>
+                </PopoverContent>
+              </Popover>
+            )}
+
+            {/* Regenerate Button */}
+            {onRegenerate && (
+              <Button
+                variant='outline'
+                size='sm'
+                onClick={onRegenerate}
+                disabled={isSaving || isRegenerating}
+                className='h-8 text-xs gap-1.5'
+                title='Regenerate cover letter with AI'
+              >
+                <Icons.sparkles className={cn('h-3.5 w-3.5', isRegenerating && 'animate-spin')} />
+                <span>Regenerate</span>
+              </Button>
+            )}
 
             {/* Copy Button */}
             <Button

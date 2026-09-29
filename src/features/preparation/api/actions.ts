@@ -14,7 +14,9 @@ import {
   updateCoverLetterDraft,
   updateQuestionAnswer,
   updateApplicationTemplateSelection,
-  recordResumeExportEvent
+  recordResumeExportEvent,
+  regenerateCoverLetterDraft,
+  regenerateQuestionAnswerDraft
 } from './service';
 import {
   ConfirmAppliedPayload,
@@ -102,6 +104,35 @@ export async function recordResumeExportEventAction(
     const candidateId = await requireCandidateId({ redirectOnUnauthenticated: false });
     const result = await recordResumeExportEvent(
       validated as unknown as RecordExportPayload,
+      candidateId
+    );
+    return serializeActionResponse(result);
+  } catch (error) {
+    return handleActionError(error);
+  }
+}
+
+export async function regenerateCoverLetterDraftAction(payload: {
+  applicationId: string;
+}): Promise<GroundedCoverLetter> {
+  try {
+    const candidateId = await requireCandidateId({ redirectOnUnauthenticated: false });
+    const result = await regenerateCoverLetterDraft(payload.applicationId, candidateId);
+    return serializeActionResponse(result);
+  } catch (error) {
+    return handleActionError(error);
+  }
+}
+
+export async function regenerateQuestionAnswerDraftAction(payload: {
+  applicationId: string;
+  questionId: string;
+}): Promise<GroundedApplicationQuestion> {
+  try {
+    const candidateId = await requireCandidateId({ redirectOnUnauthenticated: false });
+    const result = await regenerateQuestionAnswerDraft(
+      payload.applicationId,
+      payload.questionId,
       candidateId
     );
     return serializeActionResponse(result);

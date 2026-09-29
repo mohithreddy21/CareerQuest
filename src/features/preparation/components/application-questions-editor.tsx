@@ -20,17 +20,20 @@ import { toast } from 'sonner';
 export interface ApplicationQuestionsEditorProps {
   questions: GroundedApplicationQuestion[];
   onUpdateQuestion: (updated: GroundedApplicationQuestion) => void;
+  onRegenerateQuestion?: (question: GroundedApplicationQuestion) => void;
   isSaving?: boolean;
 }
 
 export function ApplicationQuestionsEditor({
   questions,
   onUpdateQuestion,
+  onRegenerateQuestion,
   isSaving
 }: ApplicationQuestionsEditorProps) {
   const [editingQuestion, setEditingQuestion] = useState<GroundedApplicationQuestion | null>(null);
   const [candidateText, setCandidateText] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [regeneratingId, setRegeneratingId] = useState<string | null>(null);
 
   const handleOpenEdit = (q: GroundedApplicationQuestion) => {
     setEditingQuestion(q);
@@ -53,6 +56,19 @@ export function ApplicationQuestionsEditor({
       ...q,
       reviewed: !q.reviewed
     });
+  };
+
+  const handleRegenerate = async (q: GroundedApplicationQuestion) => {
+    if (!onRegenerateQuestion) return;
+    setRegeneratingId(q.id);
+    try {
+      await onRegenerateQuestion(q);
+      toast.success('Regenerated answer with fresh grounding context.');
+    } catch {
+      toast.error('Failed to regenerate answer.');
+    } finally {
+      setRegeneratingId(null);
+    }
   };
 
   const handleCopyAnswer = (q: GroundedApplicationQuestion) => {
@@ -88,6 +104,7 @@ export function ApplicationQuestionsEditor({
         {questions.map((q, idx) => {
           const activeText = q.candidateEditedAnswer || q.suggestedAnswer;
           const isCustom = Boolean(q.candidateEditedAnswer);
+          const isMissingEvidence = q.reviewStatus === 'MISSING_EVIDENCE';
 
           return (
             <div
@@ -100,13 +117,35 @@ export function ApplicationQuestionsEditor({
               {/* Question Header */}
               <div className='flex flex-wrap items-start justify-between gap-2'>
                 <div className='space-y-1 max-w-xl'>
-                  <div className='flex items-center gap-2'>
+                  <div className='flex items-center gap-2 flex-wrap'>
                     <span className='font-mono text-xs font-bold text-muted-foreground'>
                       Q{idx + 1}.
                     </span>
                     <Badge variant='secondary' className='text-[10px] capitalize font-medium'>
                       {q.category}
                     </Badge>
+                    {isMissingEvidence ? (
+                      <Badge
+                        variant='outline'
+                        className='text-[10px] text-amber-600 border-amber-500/40 bg-amber-50 dark:bg-amber-950/30 dark:text-amber-300'
+                      >
+                        Missing Evidence
+                      </Badge>
+                    ) : q.grounded ? (
+                      <Badge
+                        variant='outline'
+                        className='text-[10px] text-emerald-600 border-emerald-500/40 bg-emerald-50 dark:bg-emerald-950/30 dark:text-emerald-300'
+                      >
+                        Verified Knowledge
+                      </Badge>
+                    ) : (
+                      <Badge
+                        variant='outline'
+                        className='text-[10px] text-amber-600 border-amber-500/40 bg-amber-50 dark:bg-amber-950/30 dark:text-amber-300'
+                      >
+                        Requires Review
+                      </Badge>
+                    )}
                     {isCustom && (
                       <Badge
                         variant='outline'
@@ -127,34 +166,53 @@ export function ApplicationQuestionsEditor({
                 </div>
 
                 {/* Question Actions */}
-                <div className='flex items-center gap-1.5 shrink-0'>
+                <div className='flex items-center gap-1.5 shrink-0 flex-wrap'>
                   {/* Grounding Evidence Popover */}
-                  <Popover>
-                    <PopoverTrigger
-                      render={
-                        <Button
-                          variant='ghost'
-                          size='sm'
-                          className='h-7 text-[11px] gap-1 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400'
-                        >
-                          <Icons.circleCheck className='h-3.5 w-3.5' />
-                          <span>Evidence</span>
-                        </Button>
-                      }
-                    />
+                  {q.sourceKnowledgeItemIds?.length > 0 && (
+                    <Popover>
+                      <PopoverTrigger
+                        render={
+                          <Button
+                            variant='ghost'
+                            size='sm'
+                            className='h-7 text-[11px] gap-1 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400'
+                          >
+                            <Icons.circleCheck className='h-3.5 w-3.5' />
+                            <span>Evidence</span>
+                          </Button>
+                        }
+                      />
 
-                    <PopoverContent className='w-72 text-xs p-3 space-y-1.5' align='end'>
-                      <p className='font-bold text-foreground text-[11px] flex items-center gap-1.5'>
-                        <Icons.circleCheck className='h-3.5 w-3.5 text-emerald-600' />
-                        Grounded Sources:
-                      </p>
-                      <ul className='list-disc pl-4 space-y-1 text-[11px] text-muted-foreground'>
-                        {q.evidenceReferences.map((ref, rIdx) => (
-                          <li key={rIdx}>{ref}</li>
-                        ))}
-                      </ul>
-                    </PopoverContent>
-                  </Popover>
+                      <PopoverContent className='w-72 text-xs p-3 space-y-1.5' align='end'>
+                        <p className='font-bold text-foreground text-[11px] flex items-center gap-1.5'>
+                          <Icons.circleCheck className='h-3.5 w-3.5 text-emerald-600' />
+                          Grounded Sources:
+                        </p>
+                        <ul className='list-disc pl-4 space-y-1 text-[11px] text-muted-foreground'>
+                          {q.evidenceReferences.map((ref, rIdx) => (
+                            <li key={rIdx}>{ref}</li>
+                          ))}
+                        </ul>
+                      </PopoverContent>
+                    </Popover>
+                  )}
+
+                  {/* Regenerate Answer */}
+                  {onRegenerateQuestion && (
+                    <Button
+                      variant='ghost'
+                      size='sm'
+                      onClick={() => handleRegenerate(q)}
+                      disabled={isSaving || regeneratingId === q.id}
+                      className='h-7 text-[11px] gap-1'
+                      title='Regenerate answer with AI'
+                    >
+                      <Icons.sparkles
+                        className={cn('h-3 w-3', regeneratingId === q.id && 'animate-spin')}
+                      />
+                      <span>Regenerate</span>
+                    </Button>
+                  )}
 
                   {/* Copy Answer */}
                   <Button
@@ -204,6 +262,17 @@ export function ApplicationQuestionsEditor({
                   </Button>
                 </div>
               </div>
+
+              {/* Missing Evidence Note Banner */}
+              {q.missingEvidenceNote && (
+                <div className='rounded-md border border-amber-500/30 bg-amber-50/70 dark:bg-amber-950/20 p-2.5 text-xs text-amber-900 dark:text-amber-200 flex items-start gap-2'>
+                  <Icons.warning className='h-4 w-4 shrink-0 text-amber-600 mt-0.5' />
+                  <div>
+                    <span className='font-semibold'>Missing Evidence: </span>
+                    {q.missingEvidenceNote}
+                  </div>
+                </div>
+              )}
 
               {/* Answer Body */}
               <div className='rounded bg-muted/40 p-3 text-xs text-foreground/90 leading-relaxed font-sans border border-border/40'>

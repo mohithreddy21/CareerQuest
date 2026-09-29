@@ -73,34 +73,61 @@ export function ResumeChangeCard({
             <Popover>
               <PopoverTrigger
                 render={
-                  <Button
-                    variant='ghost'
-                    size='sm'
-                    className='h-6 px-1.5 text-[11px] text-emerald-600 dark:text-emerald-400 gap-1 hover:bg-emerald-500/10'
-                  >
-                    <Icons.badgeCheck className='h-3.5 w-3.5' />
-                    <span>Grounded</span>
-                  </Button>
+                  change.grounded !== false ? (
+                    <Button
+                      variant='ghost'
+                      size='sm'
+                      className='h-6 px-1.5 text-[11px] text-emerald-600 dark:text-emerald-400 gap-1 hover:bg-emerald-500/10'
+                    >
+                      <Icons.badgeCheck className='h-3.5 w-3.5' />
+                      <span>Verified Knowledge</span>
+                    </Button>
+                  ) : (
+                    <Button
+                      variant='ghost'
+                      size='sm'
+                      className='h-6 px-1.5 text-[11px] text-amber-600 dark:text-amber-400 gap-1 hover:bg-amber-500/10'
+                    >
+                      <Icons.warning className='h-3.5 w-3.5' />
+                      <span>Requires Candidate Review</span>
+                    </Button>
+                  )
                 }
               />
               <PopoverContent className='w-80 p-3 text-xs space-y-2' align='start'>
                 <div className='font-semibold text-foreground flex items-center gap-1.5'>
-                  <Icons.badgeCheck className='h-4 w-4 text-emerald-600 dark:text-emerald-400' />
-                  <span>Grounded in Knowledge Bank</span>
+                  {change.grounded !== false ? (
+                    <>
+                      <Icons.badgeCheck className='h-4 w-4 text-emerald-600 dark:text-emerald-400' />
+                      <span>Grounded in your Knowledge Bank</span>
+                    </>
+                  ) : (
+                    <>
+                      <Icons.warning className='h-4 w-4 text-amber-600 dark:text-amber-400' />
+                      <span>Requires Candidate Review</span>
+                    </>
+                  )}
                 </div>
                 <p className='text-muted-foreground text-[11px] leading-relaxed'>
-                  This proposed statement is strictly anchored to approved candidate facts. Zero
-                  synthetic claims were introduced.
+                  {change.grounded !== false
+                    ? 'This proposed statement is strictly anchored to approved candidate facts. Zero synthetic claims were introduced.'
+                    : 'This statement introduces claims or metrics that could not be independently verified in your Knowledge Bank. Explicit candidate review is required.'}
                 </p>
                 <div className='rounded-md bg-muted/50 p-2 space-y-1 text-[11px] border border-border/40'>
                   <p>
                     <strong className='text-foreground'>Knowledge IDs: </strong>
-                    <code className='text-[10px]'>{change.sourceKnowledgeItemIds.join(', ')}</code>
+                    <code className='text-[10px]'>
+                      {change.sourceKnowledgeItemIds?.length > 0
+                        ? change.sourceKnowledgeItemIds.join(', ')
+                        : 'None cited'}
+                    </code>
                   </p>
-                  <p>
-                    <strong className='text-foreground'>Verified Evidence: </strong>
-                    {change.sourceCandidateEvidence}
-                  </p>
+                  {change.sourceCandidateEvidence && (
+                    <p>
+                      <strong className='text-foreground'>Verified Evidence: </strong>
+                      {change.sourceCandidateEvidence}
+                    </p>
+                  )}
                 </div>
               </PopoverContent>
             </Popover>

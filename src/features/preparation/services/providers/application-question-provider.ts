@@ -10,6 +10,7 @@ export interface ApplicationQuestionProvider {
     approvedKnowledge: KnowledgeItem[];
     tailoredResume: TailoredResumeVersion;
     candidate: CandidateProfile;
+    questionsToAnswer?: string[];
   }): Promise<GroundedApplicationQuestion[]>;
 }
 
@@ -19,13 +20,15 @@ export class MockApplicationQuestionProvider implements ApplicationQuestionProvi
     analysis: _analysis,
     approvedKnowledge,
     tailoredResume: _tailoredResume,
-    candidate: _candidate
+    candidate: _candidate,
+    questionsToAnswer: _questionsToAnswer
   }: {
     job: Job;
     analysis?: JobAnalysis | null;
     approvedKnowledge: KnowledgeItem[];
     tailoredResume: TailoredResumeVersion;
     candidate: CandidateProfile;
+    questionsToAnswer?: string[];
   }): Promise<GroundedApplicationQuestion[]> {
     const veloceExp = approvedKnowledge.find((k) => {
       if (k.category !== 'experience') return false;
@@ -47,7 +50,7 @@ export class MockApplicationQuestionProvider implements ApplicationQuestionProvi
       {
         id: `q-1-${job.id}`,
         question: `Why are you interested in joining ${job.company} as a ${job.title}?`,
-        category: 'interest',
+        category: 'motivation',
         suggestedAnswer: `I have long followed ${job.company}'s engineering culture and focus on high-reliability systems. Throughout my career at Veloce Labs and Apex Cloud Systems, I have focused on building scalable, latency-sensitive web architectures and developer experiences. The technical roadmap for ${job.company} directly aligns with my passion for distributed cloud services and engineering craftsmanship.`,
         sourceKnowledgeItemIds: [veloceExp?.id, apexExp?.id].filter(Boolean) as string[],
         evidenceReferences: [
@@ -55,19 +58,23 @@ export class MockApplicationQuestionProvider implements ApplicationQuestionProvi
           'Apex Cloud Systems: Enterprise cloud infrastructure'
         ],
         grounded: true,
-        reviewed: false
+        reviewed: false,
+        reviewStatus: 'VERIFIED',
+        missingEvidenceNote: null
       },
       {
         id: `q-2-${job.id}`,
         question: `Describe a recent technical challenge you solved and how you measured success.`,
-        category: 'experience',
+        category: 'behavioral',
         suggestedAnswer: `At Veloce Labs, our core dashboard experienced p95 latency spikes up to 2.4s under peak concurrency. I spearheaded an architectural overhaul incorporating SSR streaming, query cache normalization, and tiered Redis caching. This dropped p95 latency by over 80% down to 420ms and cut Redis CPU utilization by 45%, directly improving retention across 120,000 active users.`,
         sourceKnowledgeItemIds: [veloceExp?.id].filter(Boolean) as string[],
         evidenceReferences: [
           'Veloce Labs: p95 latency reduction from 2.4s to 420ms via SSR streaming & Redis cache tiering'
         ],
         grounded: true,
-        reviewed: false
+        reviewed: false,
+        reviewStatus: 'VERIFIED',
+        missingEvidenceNote: null
       },
       {
         id: `q-3-${job.id}`,
@@ -79,19 +86,23 @@ export class MockApplicationQuestionProvider implements ApplicationQuestionProvi
           'OpenMetric Dashboard: 1.8k GitHub stars & 300+ engineering teams in production'
         ],
         grounded: true,
-        reviewed: false
+        reviewed: false,
+        reviewStatus: 'VERIFIED',
+        missingEvidenceNote: null
       },
       {
         id: `q-4-${job.id}`,
         question: `How do you collaborate across disciplines (product, design, infra) to maintain delivery velocity?`,
-        category: 'fit',
+        category: 'behavioral',
         suggestedAnswer: `I treat engineering velocity and product alignment as shared responsibilities. At Veloce Labs, I led full-stack squads in close sync with product managers and UX designers, establishing clear API contracts early and implementing optimistic UI patterns so features felt instantaneous to users while backend pipelines scaled safely.`,
         sourceKnowledgeItemIds: [veloceExp?.id].filter(Boolean) as string[],
         evidenceReferences: [
           'Veloce Labs: Full-stack squad leadership & mentoring 4 junior/mid engineers'
         ],
         grounded: true,
-        reviewed: false
+        reviewed: false,
+        reviewStatus: 'VERIFIED',
+        missingEvidenceNote: null
       }
     ];
 

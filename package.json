@@ -31,6 +31,9 @@
     "verify:phase7d": "tsx scripts/verify-phase7d.ts",
     "verify:phase7e": "tsx scripts/verify-phase7e.ts",
     "verify:phase7f": "tsx scripts/verify-phase7f.ts",
+    "verify:phase8a": "tsx scripts/verify-phase8a.ts",
+    "verify:phase8b": "tsx scripts/verify-phase8b-tailoring.ts",
+    "verify:phase8c": "tsx scripts/verify-phase8c-preparation.ts",
     "verify:pdf-regression": "tsx scripts/verify-pdf-extraction-regression.ts",
     "verify:production-readiness": "tsx scripts/verify-production-readiness.ts"
   },

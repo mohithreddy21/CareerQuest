@@ -10,37 +10,39 @@ import {
 } from '@/types/preparation';
 import { ResumeTemplateId } from '@/types/templates';
 import { getResumeTemplate } from '@/features/templates/constants/templates';
-import { mockCoverLetterProvider, CoverLetterProvider } from './providers/cover-letter-provider';
+import { CoverLetterProvider } from './providers/cover-letter-provider';
+import { ApplicationQuestionProvider } from './providers/application-question-provider';
 import {
-  mockApplicationQuestionProvider,
-  ApplicationQuestionProvider
-} from './providers/application-question-provider';
+  getCoverLetterProvider,
+  getApplicationQuestionProvider
+} from './providers/preparation-provider.factory';
+import { positiveGroundingValidator } from '@/features/tailoring/services/grounding-validator';
 
 export class ApplicationPreparationService {
   constructor(
-    private coverLetterProvider: CoverLetterProvider = mockCoverLetterProvider,
-    private questionProvider: ApplicationQuestionProvider = mockApplicationQuestionProvider
+    private coverLetterProvider: CoverLetterProvider = getCoverLetterProvider(),
+    private questionProvider: ApplicationQuestionProvider = getApplicationQuestionProvider()
   ) {}
 
   /**
    * Validate that all referenced knowledge item IDs exist in candidate's approved knowledge bank
-   * and that no fabricated claims exist.
+   * and that factual claims are positively anchored without fabrication.
    */
   validateGrounding(
+    text: string,
     sourceKnowledgeItemIds: string[],
     approvedKnowledge: KnowledgeItem[],
-    candidateId: string
+    candidateId: string,
+    allowPersuasiveLanguage: boolean = false
   ): boolean {
-    if (!sourceKnowledgeItemIds || sourceKnowledgeItemIds.length === 0) {
-      return false;
-    }
-
-    const approvedItems = approvedKnowledge.filter(
-      (k) => k.status === 'approved' && k.candidateId === candidateId
-    );
-    const approvedIds = new Set(approvedItems.map((k) => k.id));
-
-    return sourceKnowledgeItemIds.every((id) => approvedIds.has(id));
+    const validation = positiveGroundingValidator.validateClaim({
+      proposedText: text,
+      sourceKnowledgeItemIds,
+      candidateId,
+      candidateApprovedKnowledge: approvedKnowledge,
+      allowPersuasiveLanguage
+    });
+    return validation.isValid && validation.status === 'GROUNDED';
   }
 
   /**
@@ -71,22 +73,13 @@ export class ApplicationPreparationService {
     if (existingCoverLetter) {
       coverLetter = existingCoverLetter;
     } else {
-      const generated = await this.coverLetterProvider.generateCoverLetter({
+      coverLetter = await this.coverLetterProvider.generateCoverLetter({
         job,
         analysis,
         approvedKnowledge,
         tailoredResume,
         candidate
       });
-      const isGrounded = this.validateGrounding(
-        generated.sourceKnowledgeItemIds,
-        approvedKnowledge,
-        candidate.id
-      );
-      coverLetter = {
-        ...generated,
-        grounded: isGrounded
-      };
     }
 
     // 2. Application questions
@@ -94,20 +87,66 @@ export class ApplicationPreparationService {
     if (existingQuestions && existingQuestions.length > 0) {
       questions = existingQuestions;
     } else {
-      const generatedQ = await this.questionProvider.generateQuestions({
+      questions = await this.questionProvider.generateQuestions({
         job,
         analysis,
         approvedKnowledge,
         tailoredResume,
         candidate
       });
-      questions = generatedQ.map((q) => ({
-        ...q,
-        grounded: this.validateGrounding(q.sourceKnowledgeItemIds, approvedKnowledge, candidate.id)
-      }));
     }
 
     return { coverLetter, questions };
+  }
+
+  /**
+   * Regenerates a grounded cover letter from scratch for the application.
+   */
+  async regenerateCoverLetter(params: {
+    job: Job;
+    analysis?: JobAnalysis | null;
+    approvedKnowledge: KnowledgeItem[];
+    tailoredResume: TailoredResumeVersion;
+    candidate: CandidateProfile;
+    toneOrInstructions?: string;
+  }): Promise<GroundedCoverLetter> {
+    return this.coverLetterProvider.generateCoverLetter(params);
+  }
+
+  /**
+   * Regenerates or answers a specific question.
+   */
+  async regenerateQuestionAnswer(params: {
+    question: string;
+    job: Job;
+    analysis?: JobAnalysis | null;
+    approvedKnowledge: KnowledgeItem[];
+    tailoredResume: TailoredResumeVersion;
+    candidate: CandidateProfile;
+  }): Promise<GroundedApplicationQuestion> {
+    const questions = await this.questionProvider.generateQuestions({
+      job: params.job,
+      analysis: params.analysis,
+      approvedKnowledge: params.approvedKnowledge,
+      tailoredResume: params.tailoredResume,
+      candidate: params.candidate,
+      questionsToAnswer: [params.question]
+    });
+
+    return (
+      questions[0] || {
+        id: `q-regen-${Date.now()}`,
+        question: params.question,
+        category: 'other',
+        suggestedAnswer: '',
+        sourceKnowledgeItemIds: [],
+        evidenceReferences: [],
+        grounded: false,
+        reviewed: false,
+        reviewStatus: 'REQUIRES_REVIEW',
+        missingEvidenceNote: null
+      }
+    );
   }
 
   /**
