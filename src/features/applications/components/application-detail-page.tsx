@@ -275,6 +275,17 @@ export default function ApplicationDetailPage({ applicationId }: { applicationId
               </Select>
             </div>
 
+            <Link
+              href={`/dashboard/applications/${application.id}/prepare`}
+              className={
+                buttonVariants({ variant: 'outline', size: 'default' }) +
+                ' shadow-xs text-xs gap-1.5 font-semibold'
+              }
+            >
+              <Icons.check className='h-4 w-4' />
+              <span>Ready Room</span>
+            </Link>
+
             <Button
               onClick={() => setHandoffModalOpen(true)}
               size='default'
@@ -352,6 +363,17 @@ export default function ApplicationDetailPage({ applicationId }: { applicationId
               </div>
 
               <div className='flex flex-wrap items-center gap-2 shrink-0'>
+                <Link
+                  href={`/dashboard/applications/${application.id}/prepare`}
+                  className={
+                    buttonVariants({ variant: 'outline', size: 'lg' }) +
+                    ' shadow-sm text-xs gap-2 font-semibold'
+                  }
+                >
+                  <Icons.check className='h-4 w-4' />
+                  <span>Enter Ready Room</span>
+                </Link>
+
                 <Button
                   onClick={() => setHandoffModalOpen(true)}
                   size='lg'

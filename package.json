@@ -34,6 +34,7 @@
     "verify:phase8a": "tsx scripts/verify-phase8a.ts",
     "verify:phase8b": "tsx scripts/verify-phase8b-tailoring.ts",
     "verify:phase8c": "tsx scripts/verify-phase8c-preparation.ts",
+    "verify:phase8d": "tsx scripts/verify-phase8d-ready-room.ts",
     "verify:phase-a": "tsx scripts/verify-phase-a-foundation.ts",
     "verify:phase-b": "tsx scripts/verify-phase-b-primitives.ts",
     "verify:pdf-regression": "tsx scripts/verify-pdf-extraction-regression.ts",

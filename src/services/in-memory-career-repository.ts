@@ -2414,6 +2414,18 @@ export class InMemoryCareerRepository implements ICareerRepository {
     app.selectedTemplateVersion = templateVersion;
     app.matchScoreAtApplication = matchScore;
     app.resumeSnapshot = frozenResumeSnapshot;
+    if (!app.applicationAnswers && app.preparedQuestions) {
+      app.applicationAnswers = (
+        app.preparedQuestions as unknown as Array<Record<string, unknown>>
+      ).map((q) => ({
+        questionId: q.id,
+        question: q.question,
+        category: q.category,
+        answer: q.candidateEditedAnswer || q.suggestedAnswer || '',
+        reviewed: Boolean(q.reviewed),
+        sourceKnowledgeItemIds: q.sourceKnowledgeItemIds || []
+      })) as unknown as import('@/types/domain').ApplicationAnswer[];
+    }
     app.version = (app.version || 1) + 1;
 
     if (!app.statusHistory) app.statusHistory = [];
@@ -2553,16 +2565,17 @@ export class InMemoryCareerRepository implements ICareerRepository {
     }
 
     const isApplied = app.status === 'applied' || Boolean(app.dateApplied);
-    const allowResumeUpdate = !isApplied;
+    const allowPrepUpdate = !isApplied;
 
-    if (updates.coverLetterData) app.coverLetterData = updates.coverLetterData;
-    if (updates.coverLetter !== undefined) app.coverLetter = updates.coverLetter;
-    if (updates.preparedQuestions) app.preparedQuestions = updates.preparedQuestions;
-    if (allowResumeUpdate && updates.selectedTemplateId)
+    if (allowPrepUpdate && updates.coverLetterData) app.coverLetterData = updates.coverLetterData;
+    if (allowPrepUpdate && updates.coverLetter !== undefined) app.coverLetter = updates.coverLetter;
+    if (allowPrepUpdate && updates.preparedQuestions)
+      app.preparedQuestions = updates.preparedQuestions;
+    if (allowPrepUpdate && updates.selectedTemplateId)
       app.selectedTemplateId = updates.selectedTemplateId;
-    if (allowResumeUpdate && updates.selectedTemplateVersion)
+    if (allowPrepUpdate && updates.selectedTemplateVersion)
       app.selectedTemplateVersion = updates.selectedTemplateVersion;
-    if (allowResumeUpdate && updates.tailoredResumeVersionId) {
+    if (allowPrepUpdate && updates.tailoredResumeVersionId) {
       app.tailoredResumeVersionId = updates.tailoredResumeVersionId;
       app.resumeVersionId = updates.tailoredResumeVersionId;
     }

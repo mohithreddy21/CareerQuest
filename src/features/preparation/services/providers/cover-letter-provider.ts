@@ -96,7 +96,7 @@ export class MockCoverLetterProvider implements CoverLetterProvider {
       .filter((k) => k.category === 'skill')
       .map((k) => ((k.content as { name?: string }).name || '').toLowerCase());
 
-    const verifiedSkills = job.requiredSkills.filter((req) =>
+    const verifiedSkills = (job.requiredSkills || []).filter((req) =>
       approvedSkillNames.some(
         (appr) => appr.includes(req.toLowerCase()) || req.toLowerCase().includes(appr)
       )

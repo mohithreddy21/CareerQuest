@@ -3232,6 +3232,19 @@ export class PrismaCareerRepository implements ICareerRepository {
         }
       ];
 
+      const applicationAnswers =
+        app.applicationAnswers ||
+        (Array.isArray(app.preparedQuestions)
+          ? (app.preparedQuestions as unknown as Array<Record<string, unknown>>).map((q) => ({
+              questionId: q.id,
+              question: q.question,
+              category: q.category,
+              answer: q.candidateEditedAnswer || q.suggestedAnswer || '',
+              reviewed: Boolean(q.reviewed),
+              sourceKnowledgeItemIds: q.sourceKnowledgeItemIds || []
+            }))
+          : undefined);
+
       const updated = await tx.application.update({
         where: { id: app.id },
         data: {
@@ -3244,6 +3257,9 @@ export class PrismaCareerRepository implements ICareerRepository {
           selectedTemplateVersion: templateVersion,
           matchScoreAtApplication: matchScore,
           resumeSnapshot: frozenResumeSnapshot as unknown as Prisma.InputJsonValue,
+          ...(applicationAnswers !== undefined
+            ? { applicationAnswers: applicationAnswers as unknown as Prisma.InputJsonValue }
+            : {}),
           statusHistory: statusHistory as unknown as Prisma.InputJsonValue,
           version: { increment: 1 },
           updatedAt: now
@@ -3394,31 +3410,44 @@ export class PrismaCareerRepository implements ICareerRepository {
     }
 
     // Historical integrity invariant:
-    // Once an application is applied, selectedTemplateId, selectedTemplateVersion, and tailoredResumeVersionId
+    // Once an application is applied, all submitted materials (resume, template, cover letter, questions)
     // must remain immutable snapshots of what was actually submitted!
     const isApplied = app.status === 'applied' || Boolean(app.dateApplied);
-    const allowResumeUpdate = !isApplied;
+    const allowPrepUpdate = !isApplied;
+
+    let validResumeVersionId: string | null = null;
+    if (allowPrepUpdate && updates.tailoredResumeVersionId) {
+      const exists = await prisma.resumeVersion.findUnique({
+        where: { id: updates.tailoredResumeVersionId },
+        select: { id: true }
+      });
+      if (exists) {
+        validResumeVersionId = exists.id;
+      }
+    }
 
     const updated = await prisma.application.update({
       where: { id },
       data: {
-        ...(updates.coverLetterData
+        ...(allowPrepUpdate && updates.coverLetterData
           ? { coverLetterData: updates.coverLetterData as unknown as Prisma.InputJsonValue }
           : {}),
-        ...(updates.coverLetter !== undefined ? { coverLetter: updates.coverLetter } : {}),
-        ...(updates.preparedQuestions
+        ...(allowPrepUpdate && updates.coverLetter !== undefined
+          ? { coverLetter: updates.coverLetter }
+          : {}),
+        ...(allowPrepUpdate && updates.preparedQuestions
           ? { preparedQuestions: updates.preparedQuestions as unknown as Prisma.InputJsonValue }
           : {}),
-        ...(allowResumeUpdate && updates.selectedTemplateId
+        ...(allowPrepUpdate && updates.selectedTemplateId
           ? { selectedTemplateId: updates.selectedTemplateId }
           : {}),
-        ...(allowResumeUpdate && updates.selectedTemplateVersion
+        ...(allowPrepUpdate && updates.selectedTemplateVersion
           ? { selectedTemplateVersion: updates.selectedTemplateVersion }
           : {}),
-        ...(allowResumeUpdate && updates.tailoredResumeVersionId
+        ...(validResumeVersionId
           ? {
-              tailoredResumeVersionId: updates.tailoredResumeVersionId,
-              resumeVersionId: updates.tailoredResumeVersionId
+              tailoredResumeVersionId: validResumeVersionId,
+              resumeVersionId: validResumeVersionId
             }
           : {}),
         version: { increment: 1 },

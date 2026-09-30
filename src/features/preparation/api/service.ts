@@ -96,7 +96,9 @@ export async function getPreparationMaterials(
         preparedQuestions: questions,
         selectedTemplateId,
         selectedTemplateVersion: RESUME_TEMPLATES[selectedTemplateId]?.version || '1.0',
-        tailoredResumeVersionId: activeResume.id
+        ...(tailoredResume && !tailoredResume.id.startsWith('resume-baseline-')
+          ? { tailoredResumeVersionId: tailoredResume.id }
+          : {})
       },
       candId
     );
@@ -131,6 +133,12 @@ export async function updateCoverLetterDraft(
   const candId = candidateId || (await requireCandidateId({ redirectOnUnauthenticated: false }));
   const application = await careerRepository.getApplicationById(payload.applicationId, candId);
   if (!application) throw new Error(`Application not found: ${payload.applicationId}`);
+
+  if (application.status === 'applied' || Boolean(application.dateApplied)) {
+    throw new Error(
+      `Cannot modify cover letter: Application ${payload.applicationId} has already been submitted and is historically frozen.`
+    );
+  }
 
   const candidate = await careerRepository.getCandidateProfile(candId);
   const kb = await careerRepository.getKnowledgeBank(candidate.id);
@@ -175,6 +183,12 @@ export async function updateQuestionAnswer(
   const candId = candidateId || (await requireCandidateId({ redirectOnUnauthenticated: false }));
   const application = await careerRepository.getApplicationById(payload.applicationId, candId);
   if (!application) throw new Error(`Application not found: ${payload.applicationId}`);
+
+  if (application.status === 'applied' || Boolean(application.dateApplied)) {
+    throw new Error(
+      `Cannot modify question answers: Application ${payload.applicationId} has already been submitted and is historically frozen.`
+    );
+  }
 
   const candidate = await careerRepository.getCandidateProfile(candId);
   const kb = await careerRepository.getKnowledgeBank(candidate.id);
@@ -225,6 +239,12 @@ export async function regenerateCoverLetterDraft(
   const application = await careerRepository.getApplicationById(applicationId, candId);
   if (!application) throw new Error(`Application not found: ${applicationId}`);
 
+  if (application.status === 'applied' || Boolean(application.dateApplied)) {
+    throw new Error(
+      `Cannot regenerate cover letter: Application ${applicationId} has already been submitted and is historically frozen.`
+    );
+  }
+
   const candidate = await careerRepository.getCandidateProfile(candId);
   const kb = await careerRepository.getKnowledgeBank(candidate.id);
   const approvedKnowledge = [
@@ -269,6 +289,12 @@ export async function regenerateQuestionAnswerDraft(
   const candId = candidateId || (await requireCandidateId({ redirectOnUnauthenticated: false }));
   const application = await careerRepository.getApplicationById(applicationId, candId);
   if (!application) throw new Error(`Application not found: ${applicationId}`);
+
+  if (application.status === 'applied' || Boolean(application.dateApplied)) {
+    throw new Error(
+      `Cannot regenerate question answer: Application ${applicationId} has already been submitted and is historically frozen.`
+    );
+  }
 
   const existingQ = (application.preparedQuestions || []).find((q) => q.id === questionId);
   if (!existingQ) throw new Error(`Question not found: ${questionId}`);
@@ -323,6 +349,13 @@ export async function updateApplicationTemplateSelection(
   candidateId?: string
 ): Promise<{ templateId: ResumeTemplateId }> {
   const candId = candidateId || (await requireCandidateId({ redirectOnUnauthenticated: false }));
+  const application = await careerRepository.getApplicationById(payload.applicationId, candId);
+  if (!application) throw new Error(`Application not found: ${payload.applicationId}`);
+
+  if (application.status === 'applied' || Boolean(application.dateApplied)) {
+    return { templateId: application.selectedTemplateId || payload.templateId };
+  }
+
   const version = RESUME_TEMPLATES[payload.templateId]?.version || '1.0';
   await careerRepository.updateApplicationPreparation(
     payload.applicationId,

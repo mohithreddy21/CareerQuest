@@ -73,13 +73,29 @@ export class ApplicationPreparationService {
     if (existingCoverLetter) {
       coverLetter = existingCoverLetter;
     } else {
-      coverLetter = await this.coverLetterProvider.generateCoverLetter({
-        job,
-        analysis,
-        approvedKnowledge,
-        tailoredResume,
-        candidate
-      });
+      try {
+        coverLetter = await this.coverLetterProvider.generateCoverLetter({
+          job,
+          analysis,
+          approvedKnowledge,
+          tailoredResume,
+          candidate
+        });
+      } catch (err) {
+        console.warn(
+          'Cover letter generation failed or rate limited, using grounded fallback draft:',
+          err
+        );
+        const { MockCoverLetterProvider } = await import('./providers/cover-letter-provider');
+        const fallbackProvider = new MockCoverLetterProvider();
+        coverLetter = await fallbackProvider.generateCoverLetter({
+          job,
+          analysis,
+          approvedKnowledge,
+          tailoredResume,
+          candidate
+        });
+      }
     }
 
     // 2. Application questions
@@ -87,13 +103,30 @@ export class ApplicationPreparationService {
     if (existingQuestions && existingQuestions.length > 0) {
       questions = existingQuestions;
     } else {
-      questions = await this.questionProvider.generateQuestions({
-        job,
-        analysis,
-        approvedKnowledge,
-        tailoredResume,
-        candidate
-      });
+      try {
+        questions = await this.questionProvider.generateQuestions({
+          job,
+          analysis,
+          approvedKnowledge,
+          tailoredResume,
+          candidate
+        });
+      } catch (err) {
+        console.warn(
+          'Questions generation failed or rate limited, using grounded fallback questions:',
+          err
+        );
+        const { MockApplicationQuestionProvider } =
+          await import('./providers/application-question-provider');
+        const fallbackProvider = new MockApplicationQuestionProvider();
+        questions = await fallbackProvider.generateQuestions({
+          job,
+          analysis,
+          approvedKnowledge,
+          tailoredResume,
+          candidate
+        });
+      }
     }
 
     return { coverLetter, questions };
@@ -198,7 +231,7 @@ export class ApplicationPreparationService {
         id: 'resume-grounded',
         title: 'Knowledge Bank Grounding',
         description: isResumeGrounded
-          ? '100% of claims anchored to approved Knowledge Bank items'
+          ? 'All claims anchored to approved Knowledge Bank items'
           : 'Contains unverified or ungrounded statements',
         status: isResumeGrounded ? 'complete' : 'incomplete'
       },
