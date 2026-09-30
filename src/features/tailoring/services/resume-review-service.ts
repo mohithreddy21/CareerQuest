@@ -69,8 +69,13 @@ export class ResumeReviewService {
     }
 
     // 3. Assemble initial tailored version
+    const versionId =
+      candidateId && candidateId !== 'cand-1'
+        ? `res-tailored-${candidateId}-${job.id}`
+        : `res-tailored-${job.id}`;
+
     const initialVersion: TailoredResumeVersion = {
-      id: `res-tailored-${job.id}`,
+      id: versionId,
       candidateId,
       masterResumeId: activeMasterResume.id,
       jobId: job.id,

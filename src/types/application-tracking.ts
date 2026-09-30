@@ -164,3 +164,43 @@ export interface SearchInsight {
   actionUrl?: string;
   actionLabel?: string;
 }
+
+// 8. Historical Submission Snapshot (Phase 8E)
+export interface JobSnapshot {
+  title: string;
+  company: string;
+  location: string;
+  workArrangement: string;
+  description: string;
+  responsibilities: string[];
+  requiredSkills: string[];
+  preferredSkills: string[];
+  sourceUrl?: string | null;
+  capturedAt: string; // ISO string
+}
+
+export interface ApplicationHistoricalPackage {
+  applicationId: string;
+  candidateId: string;
+  jobId: string;
+  status: import('./domain').ApplicationStatus;
+  dateApplied: string;
+  matchScoreAtApplication: number | null;
+  selectedTemplateId: ResumeTemplateId;
+  selectedTemplateVersion: string;
+  resumeSnapshot: import('./resume-content').ResumeContent | null;
+  coverLetter: string | null;
+  coverLetterData: import('./preparation').GroundedCoverLetter | null;
+  applicationAnswers: Array<{
+    questionId: string;
+    question: string;
+    category?: string;
+    answer: string;
+    reviewed?: boolean;
+    sourceKnowledgeItemIds?: string[];
+  }>;
+  jobSnapshot: JobSnapshot | null;
+  currentJob: import('./domain').Job;
+  isHistoricalJobSnapshot: boolean;
+  submissionEventTimestamp?: string;
+}

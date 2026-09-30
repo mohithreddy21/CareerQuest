@@ -1,6 +1,9 @@
 import PageContainer from '@/components/layout/page-container';
 import { getQueryClient } from '@/lib/query-client';
-import { applicationByIdOptions } from '@/features/applications/api/queries';
+import {
+  applicationByIdOptions,
+  applicationHistoricalPackageOptions
+} from '@/features/applications/api/queries';
 import { preparationMaterialsQueryOptions } from '@/features/preparation/api/queries';
 import ApplicationDetailPage from '@/features/applications/components/application-detail-page';
 import { dehydrate, HydrationBoundary } from '@tanstack/react-query';
@@ -29,6 +32,7 @@ export default async function Page({ params }: { params: Promise<{ applicationId
 
   void queryClient.prefetchQuery(applicationByIdOptions(applicationId));
   void queryClient.prefetchQuery(preparationMaterialsQueryOptions(applicationId));
+  void queryClient.prefetchQuery(applicationHistoricalPackageOptions(applicationId));
 
   return (
     <PageContainer

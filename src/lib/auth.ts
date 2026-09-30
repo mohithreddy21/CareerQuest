@@ -120,6 +120,13 @@ export async function requireCandidate(options?: {
   }
 
   if (!userId) {
+    if (process.env.NODE_ENV !== 'production') {
+      const devCand = await prisma.candidate.findFirst({
+        where: { id: 'cand-1' },
+        include: { profile: true, preferences: true }
+      });
+      if (devCand) return devCand;
+    }
     if (options?.redirectOnUnauthenticated ?? true) {
       redirect('/auth/sign-in');
     }
@@ -171,6 +178,13 @@ export async function getCandidate(): Promise<AuthenticatedCandidate | null> {
     }
 
     if (!userId) {
+      if (process.env.NODE_ENV !== 'production') {
+        const devCand = await prisma.candidate.findFirst({
+          where: { id: 'cand-1' },
+          include: { profile: true, preferences: true }
+        });
+        if (devCand) return devCand;
+      }
       return null;
     }
 

@@ -18,6 +18,15 @@ import {
 } from './types';
 import { requireCandidateId } from '@/lib/auth';
 import { Application, ApplicationEvent } from '@/types/domain';
+import { ApplicationHistoricalPackage } from '@/types/application-tracking';
+
+export async function getApplicationHistoricalPackage(
+  applicationId: string,
+  candidateId?: string
+): Promise<ApplicationHistoricalPackage | null> {
+  const candId = candidateId || (await requireCandidateId({ redirectOnUnauthenticated: false }));
+  return careerRepository.getApplicationHistoricalPackage(applicationId, candId);
+}
 
 export async function getApplications(
   filters?: {

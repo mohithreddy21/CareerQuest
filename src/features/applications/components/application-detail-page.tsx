@@ -48,6 +48,7 @@ import { ExternalHandoffModal } from '@/features/preparation/components/external
 import { ApplicationFollowUpCard } from './application-follow-up-card';
 import { ApplicationInterviewsCard } from './application-interviews-card';
 import { ApplicationTimeline } from './application-timeline';
+import { SubmittedPackageViewer } from './submitted-package-viewer';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { toast } from 'sonner';
@@ -59,10 +60,12 @@ export default function ApplicationDetailPage({ applicationId }: { applicationId
   const { data: application } = useSuspenseQuery(applicationByIdOptions(applicationId));
   const { data: prepData } = useSuspenseQuery(preparationMaterialsQueryOptions(applicationId));
 
+  const isApplied = application?.status === 'applied' || Boolean(application?.dateApplied);
+
   // 2. Local State
   const [activeTab, setActiveTab] = useState<
-    'review' | 'resume' | 'materials' | 'interviews' | 'timeline' | 'overview'
-  >('review');
+    'submitted' | 'review' | 'resume' | 'materials' | 'interviews' | 'timeline' | 'overview'
+  >(isApplied ? 'submitted' : 'review');
   const [selectedTemplateId, setSelectedTemplateId] = useState<ResumeTemplateId>(
     application?.selectedTemplateId || prepData?.selectedTemplateId || 'classic-v1'
   );
@@ -298,18 +301,34 @@ export default function ApplicationDetailPage({ applicationId }: { applicationId
         </CardContent>
       </Card>
 
-      {/* 3. Main 5-Tab Workspace */}
+      {/* 3. Main Workspace Tabs */}
       <Tabs
         value={activeTab}
         onValueChange={(v) =>
           setActiveTab(
-            v as 'review' | 'resume' | 'materials' | 'interviews' | 'timeline' | 'overview'
+            v as
+              | 'submitted'
+              | 'review'
+              | 'resume'
+              | 'materials'
+              | 'interviews'
+              | 'timeline'
+              | 'overview'
           )
         }
         className='w-full space-y-4'
       >
         <div className='flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-2'>
-          <TabsList className='grid grid-cols-2 sm:grid-cols-5 w-full sm:w-auto'>
+          <TabsList className='flex flex-wrap w-full sm:w-auto h-auto p-1 gap-1'>
+            {isApplied && (
+              <TabsTrigger
+                value='submitted'
+                className='text-xs gap-1.5 data-[state=active]:bg-emerald-500/10 data-[state=active]:text-emerald-800 dark:data-[state=active]:text-emerald-300 border border-transparent data-[state=active]:border-emerald-500/30'
+              >
+                <Icons.check className='h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400' />
+                <span className='font-semibold'>Submitted Package</span>
+              </TabsTrigger>
+            )}
             <TabsTrigger value='review' className='text-xs gap-1.5'>
               <Icons.check className='h-3.5 w-3.5' />
               <span>Final Review & Status</span>
@@ -343,6 +362,13 @@ export default function ApplicationDetailPage({ applicationId }: { applicationId
             </strong>
           </span>
         </div>
+
+        {/* TAB 0: Submitted Package (Historical Frozen Record) */}
+        {isApplied && (
+          <TabsContent value='submitted' className='space-y-6 pt-1'>
+            <SubmittedPackageViewer applicationId={application.id} />
+          </TabsContent>
+        )}
 
         {/* TAB 1: Final Review & External Apply */}
         <TabsContent value='review' className='space-y-6 pt-1'>

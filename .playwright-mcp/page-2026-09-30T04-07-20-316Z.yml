@@ -1,0 +1,103 @@
+- generic [active] [ref=e1]:
+  - region "Notifications alt+T"
+  - generic [ref=e2]:
+    - link "Skip to content" [ref=e3] [cursor=pointer]:
+      - /url: "#main-content"
+    - generic [ref=e6]:
+      - generic [ref=e12]:
+        - generic [ref=e13]:
+          - generic [ref=e14]: Overview
+          - list [ref=e15]:
+            - listitem [ref=e16]:
+              - link "Dashboard" [ref=e17] [cursor=pointer]:
+                - /url: /dashboard/overview
+            - listitem [ref=e23]:
+              - link "Discover Jobs" [ref=e24] [cursor=pointer]:
+                - /url: /dashboard/discover
+            - listitem [ref=e28]:
+              - link "Applications" [ref=e29] [cursor=pointer]:
+                - /url: /dashboard/applications
+            - listitem [ref=e33]:
+              - link "Resume & Profile" [ref=e34] [cursor=pointer]:
+                - /url: /dashboard/resume
+        - generic [ref=e38]:
+          - generic [ref=e39]: Preferences
+          - list [ref=e40]:
+            - listitem [ref=e41]:
+              - link "Settings" [ref=e42] [cursor=pointer]:
+                - /url: /dashboard/settings
+      - list [ref=e47]:
+        - listitem [ref=e48]:
+          - button "CA Candidate Workspace" [ref=e49]:
+            - generic [ref=e50]:
+              - generic [ref=e51]: CA
+              - generic: Candidate Workspace
+      - button "Toggle Sidebar" [ref=e56]
+    - main [ref=e57]:
+      - generic [ref=e58]:
+        - generic [ref=e59]:
+          - button "Toggle Sidebar" [ref=e60]
+          - separator [ref=e62]
+          - navigation "breadcrumb" [ref=e63]:
+            - list [ref=e64]:
+              - listitem [ref=e65]:
+                - link "Dashboard" [ref=e66] [cursor=pointer]:
+                  - /url: /dashboard
+              - listitem [aria-hidden] [ref=e67]
+              - listitem [ref=e70]:
+                - link "Applications" [ref=e71] [cursor=pointer]:
+                  - /url: /dashboard/applications
+              - listitem [aria-hidden] [ref=e72]
+              - link "App-1" [disabled] [ref=e75]
+        - generic [ref=e76]:
+          - button "Search... ⌘ K" [ref=e79]:
+            - text: Search...
+            - generic:
+              - generic: ⌘
+              - text: K
+          - button "Toggle theme" [ref=e80]
+          - generic [ref=e83]:
+            - generic [ref=e84]: Theme
+            - combobox "Theme" [ref=e85]:
+              - generic [ref=e87]: Vercel
+              - generic: T T
+              - img [aria-hidden]: ▼
+            - textbox [aria-hidden] [ref=e88]: vercel
+          - button "Notifications" [ref=e89]
+      - generic [ref=e91]:
+        - generic [ref=e94]:
+          - heading "Application Preparation" [level=1] [ref=e96]
+          - paragraph [ref=e97]: Review tailored materials, draft answers, and track interview milestones.
+        - generic:
+          - generic:
+            - generic:
+              - generic [ref=e103]:
+                - generic:
+                  - heading "Documentation" [level=2]
+                - button "Close info panel" [ref=e105]
+              - generic [ref=e107]:
+                - generic:
+                  - heading "Getting Started" [level=3]
+                  - paragraph: Learn how to get started with this application.
+                  - generic:
+                    - heading "Learn more" [level=4]
+                    - list:
+                      - listitem:
+                        - link "Installation Guide":
+                          - /url: "#"
+                          - img:
+                            - generic [ref=e109] [cursor=pointer]
+              - button "Toggle Infobar" [ref=e110]
+  - button "Open Tanstack query devtools" [ref=e161] [cursor=pointer]
+  - generic [ref=e214] [cursor=pointer]:
+    - button "Open Next.js Dev Tools" [ref=e215]
+    - generic [ref=e219]:
+      - button "Open issues overlay" [ref=e220]:
+        - generic [ref=e221]:
+          - generic [aria-hidden] [ref=e222]: "1"
+          - generic [ref=e223]: "2"
+        - generic [ref=e224]:
+          - text: Issue
+          - generic [aria-hidden] [ref=e225]: s
+      - button "Collapse issues badge" [ref=e226]
+  - alert [ref=e229]

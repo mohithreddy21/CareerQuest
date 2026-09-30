@@ -1,0 +1,12 @@
+- generic [active]:
+  - region "Notifications alt+T"
+  - generic [ref=f6e1]:
+    - text: "404"
+    - heading "Something's missing" [level=2] [ref=f6e2]
+    - paragraph [ref=f6e3]: Sorry, the page you are looking for doesn't exist or has been moved.
+    - generic [ref=f6e4]:
+      - button "Go back" [ref=f6e5]
+      - button "Back to Home" [ref=f6e6]
+  - button "Open Tanstack query devtools" [ref=f6e57] [cursor=pointer]
+  - button "Open Next.js Dev Tools" [ref=f6e111] [cursor=pointer]
+  - alert [ref=f6e115]

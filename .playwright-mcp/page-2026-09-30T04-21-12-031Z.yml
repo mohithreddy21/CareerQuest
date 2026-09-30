@@ -1,0 +1,164 @@
+- generic [active] [ref=f11e1]:
+  - region "Notifications alt+T"
+  - generic [ref=f11e2]:
+    - link "Skip to content" [ref=f11e3] [cursor=pointer]:
+      - /url: "#main-content"
+    - generic [ref=f11e6]:
+      - generic [ref=f11e12]:
+        - generic [ref=f11e13]:
+          - generic [ref=f11e14]: Overview
+          - list [ref=f11e15]:
+            - listitem [ref=f11e16]:
+              - link "Dashboard" [ref=f11e17] [cursor=pointer]:
+                - /url: /dashboard/overview
+            - listitem [ref=f11e23]:
+              - link "Discover Jobs" [ref=f11e24] [cursor=pointer]:
+                - /url: /dashboard/discover
+            - listitem [ref=f11e28]:
+              - link "Applications" [ref=f11e29] [cursor=pointer]:
+                - /url: /dashboard/applications
+            - listitem [ref=f11e33]:
+              - link "Resume & Profile" [ref=f11e34] [cursor=pointer]:
+                - /url: /dashboard/resume
+        - generic [ref=f11e38]:
+          - generic [ref=f11e39]: Preferences
+          - list [ref=f11e40]:
+            - listitem [ref=f11e41]:
+              - link "Settings" [ref=f11e42] [cursor=pointer]:
+                - /url: /dashboard/settings
+      - list [ref=f11e47]:
+        - listitem [ref=f11e48]:
+          - button "CA Candidate Workspace" [ref=f11e49]:
+            - generic [ref=f11e50]:
+              - generic [ref=f11e51]: CA
+              - generic: Candidate Workspace
+      - button "Toggle Sidebar" [ref=f11e56]
+    - main [ref=f11e57]:
+      - generic [ref=f11e58]:
+        - generic [ref=f11e59]:
+          - button "Toggle Sidebar" [ref=f11e60]
+          - separator [ref=f11e62]
+          - navigation "breadcrumb" [ref=f11e63]:
+            - list [ref=f11e64]:
+              - listitem [ref=f11e65]:
+                - link "Dashboard" [ref=f11e66] [cursor=pointer]:
+                  - /url: /dashboard
+              - listitem [aria-hidden] [ref=f11e67]
+              - listitem [ref=f11e70]:
+                - link "Applications" [ref=f11e71] [cursor=pointer]:
+                  - /url: /dashboard/applications
+              - listitem [aria-hidden] [ref=f11e72]
+              - link "Cmukowpjy0015u48kwezsfutf" [disabled] [ref=f11e75]
+        - generic [ref=f11e76]:
+          - button "Search... ⌘ K" [ref=f11e79]:
+            - text: Search...
+            - generic:
+              - generic: ⌘
+              - text: K
+          - button "Toggle theme" [ref=f11e80]
+          - generic [ref=f11e83]:
+            - generic [ref=f11e84]: Theme
+            - combobox "Theme" [ref=f11e85]:
+              - generic [ref=f11e87]: Vercel
+              - generic: T T
+              - img [aria-hidden]: ▼
+            - textbox [aria-hidden] [ref=f11e88]: vercel
+          - button "Notifications" [ref=f11e89]
+      - generic [ref=f11e91]:
+        - generic [ref=f11e92]:
+          - generic [ref=f11e94]:
+            - heading "Application Preparation" [level=1] [ref=f11e96]
+            - paragraph [ref=f11e97]: Review tailored materials, draft answers, and track interview milestones.
+          - generic [ref=f11e98]:
+            - generic [ref=f11e99]:
+              - link "Back to Applications" [ref=f11e100] [cursor=pointer]:
+                - /url: /dashboard/applications
+              - generic [ref=f11e103]: /
+              - generic [ref=f11e104]: Staff Software Engineer, Developer Experience at Linear
+            - generic [ref=f11e106]:
+              - generic [ref=f11e107]:
+                - generic [ref=f11e108]:
+                  - heading "Staff Software Engineer, Developer Experience" [level=1] [ref=f11e109]
+                  - generic [ref=f11e110]: •
+                  - generic [ref=f11e111]: Linear
+                - generic [ref=f11e112]:
+                  - generic [ref=f11e113]: "Location: Remote (remote)"
+                  - generic [ref=f11e114]: •
+                  - generic [ref=f11e115]: "Discovered: 2026-09-28"
+              - generic [ref=f11e116]:
+                - generic [ref=f11e117]:
+                  - generic [ref=f11e118]: "Stage:"
+                  - combobox [ref=f11e119]:
+                    - generic [ref=f11e120]: Preparing
+                    - img [aria-hidden]: ▼
+                  - textbox [aria-hidden] [ref=f11e121]: preparing
+                - link "Ready Room" [ref=f11e122] [cursor=pointer]:
+                  - /url: /dashboard/applications/cmukowpjy0015u48kwezsfutf/prepare
+                - button "Apply on Linear" [ref=f11e124]
+            - generic [ref=f11e126]:
+              - generic [ref=f11e127]:
+                - tablist [ref=f11e128]:
+                  - tab "Final Review & Status" [selected] [ref=f11e129]
+                  - tab "Tailored Resume" [ref=f11e131]
+                  - tab "Cover Letter & Q&A" [ref=f11e133]
+                  - tab "Interviews & Follow-ups" [ref=f11e135]
+                  - tab "Timeline & Activity" [ref=f11e137]
+                - generic [ref=f11e139]:
+                  - text: "Readiness:"
+                  - strong [ref=f11e140]: In Review
+              - tabpanel [ref=f11e141]:
+                - generic [ref=f11e142]:
+                  - generic [ref=f11e144]:
+                    - generic [ref=f11e145]:
+                      - generic [ref=f11e146]:
+                        - generic [ref=f11e147]: Application Readiness & Pre-Flight
+                        - generic [ref=f11e148]: Review In Progress
+                      - generic [ref=f11e149]: Final pre-flight check before opening Linear's external portal.
+                    - generic [ref=f11e151]:
+                      - text: "Template:"
+                      - strong [ref=f11e152]: Classic Professional
+                  - generic [ref=f11e154]:
+                    - generic [ref=f11e158]:
+                      - paragraph [ref=f11e159]: Tailored Resume Finalized
+                      - paragraph [ref=f11e160]: Resume draft in review
+                    - generic [ref=f11e165]:
+                      - paragraph [ref=f11e166]: Knowledge Bank Grounding
+                      - paragraph [ref=f11e167]: All claims anchored to approved Knowledge Bank items
+                    - generic [ref=f11e172]:
+                      - paragraph [ref=f11e173]: Presentation Template Selected
+                      - paragraph [ref=f11e174]: Classic Professional (v1.0) configured for PDF & DOCX export
+                    - generic [ref=f11e178]:
+                      - paragraph [ref=f11e179]: Cover Letter Reviewed
+                      - paragraph [ref=f11e180]: Cover letter draft generated — needs candidate review
+                    - generic [ref=f11e184]:
+                      - paragraph [ref=f11e185]: Application Q&A Preparation
+                      - paragraph [ref=f11e186]: 0/4 application questions reviewed
+                - generic [ref=f11e188]:
+                  - generic [ref=f11e189]:
+                    - heading "Ready to submit on Linear's Career Portal?" [level=3] [ref=f11e190]
+                    - paragraph [ref=f11e191]: All application materials are grounded in your verified facts. Click below to open Linear's portal in a new tab. When finished, return here and confirm to record your submission date.
+                  - generic [ref=f11e192]:
+                    - link "Enter Ready Room" [ref=f11e193] [cursor=pointer]:
+                      - /url: /dashboard/applications/cmukowpjy0015u48kwezsfutf/prepare
+                    - button "Open Linear Application" [ref=f11e195]
+        - generic:
+          - generic:
+            - generic:
+              - generic [ref=f11e197]:
+                - generic:
+                  - heading "Documentation" [level=2]
+                - button "Close info panel" [ref=f11e199]
+              - generic [ref=f11e201]:
+                - generic:
+                  - heading "Getting Started" [level=3]
+                  - paragraph: Learn how to get started with this application.
+                  - generic:
+                    - heading "Learn more" [level=4]
+                    - list:
+                      - listitem:
+                        - link "Installation Guide":
+                          - /url: "#"
+                          - img:
+                            - generic [ref=f11e203] [cursor=pointer]
+              - button "Toggle Infobar" [ref=f11e204]
+  - button "Open Next.js Dev Tools" [ref=f11e210] [cursor=pointer]

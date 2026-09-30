@@ -1,0 +1,192 @@
+- generic [active] [ref=f12e1]:
+  - region "Notifications alt+T"
+  - generic [ref=f12e2]:
+    - link "Skip to content" [ref=f12e3] [cursor=pointer]:
+      - /url: "#main-content"
+    - generic [ref=f12e6]:
+      - generic [ref=f12e12]:
+        - generic [ref=f12e13]:
+          - generic [ref=f12e14]: Overview
+          - list [ref=f12e15]:
+            - listitem [ref=f12e16]:
+              - link "Dashboard" [ref=f12e17] [cursor=pointer]:
+                - /url: /dashboard/overview
+            - listitem [ref=f12e23]:
+              - link "Discover Jobs" [ref=f12e24] [cursor=pointer]:
+                - /url: /dashboard/discover
+            - listitem [ref=f12e28]:
+              - link "Applications" [ref=f12e29] [cursor=pointer]:
+                - /url: /dashboard/applications
+            - listitem [ref=f12e33]:
+              - link "Resume & Profile" [ref=f12e34] [cursor=pointer]:
+                - /url: /dashboard/resume
+        - generic [ref=f12e38]:
+          - generic [ref=f12e39]: Preferences
+          - list [ref=f12e40]:
+            - listitem [ref=f12e41]:
+              - link "Settings" [ref=f12e42] [cursor=pointer]:
+                - /url: /dashboard/settings
+      - list [ref=f12e47]:
+        - listitem [ref=f12e48]:
+          - button "CA Candidate Workspace" [ref=f12e49]:
+            - generic [ref=f12e50]:
+              - generic [ref=f12e51]: CA
+              - generic: Candidate Workspace
+      - button "Toggle Sidebar" [ref=f12e56]
+    - main [ref=f12e57]:
+      - generic [ref=f12e58]:
+        - generic [ref=f12e59]:
+          - button "Toggle Sidebar" [ref=f12e60]
+          - separator [ref=f12e62]
+          - navigation "breadcrumb" [ref=f12e63]:
+            - list [ref=f12e64]:
+              - listitem [ref=f12e65]:
+                - link "Dashboard" [ref=f12e66] [cursor=pointer]:
+                  - /url: /dashboard
+              - listitem [aria-hidden] [ref=f12e67]
+              - listitem [ref=f12e70]:
+                - link "Applications" [ref=f12e71] [cursor=pointer]:
+                  - /url: /dashboard/applications
+              - listitem [aria-hidden] [ref=f12e72]
+              - listitem [ref=f12e75]:
+                - link "Cmukowpjy0015u48kwezsfutf" [ref=f12e76] [cursor=pointer]:
+                  - /url: /dashboard/applications/cmukowpjy0015u48kwezsfutf
+              - listitem [aria-hidden] [ref=f12e77]
+              - link "Prepare" [disabled] [ref=f12e80]
+        - generic [ref=f12e81]:
+          - button "Search... ⌘ K" [ref=f12e84]:
+            - text: Search...
+            - generic:
+              - generic: ⌘
+              - text: K
+          - button "Toggle theme" [ref=f12e85]
+          - generic [ref=f12e88]:
+            - generic [ref=f12e89]: Theme
+            - combobox "Theme" [ref=f12e90]:
+              - generic [ref=f12e92]: Vercel
+              - generic: T T
+              - img [aria-hidden]: ▼
+            - textbox [aria-hidden] [ref=f12e93]: vercel
+          - button "Notifications" [ref=f12e94]
+      - generic [ref=f12e96]:
+        - generic [ref=f12e97]:
+          - generic [ref=f12e99]:
+            - heading "Application Ready Room" [level=1] [ref=f12e101]
+            - paragraph [ref=f12e102]: Final candidate review workspace before controlled external application handoff.
+          - generic [ref=f12e103]:
+            - generic [ref=f12e104]:
+              - link "Back to Application Detail" [ref=f12e105] [cursor=pointer]:
+                - /url: /dashboard/applications/cmukowpjy0015u48kwezsfutf
+              - generic [ref=f12e108]: /
+              - generic [ref=f12e109]: Ready Room
+            - generic [ref=f12e111]:
+              - generic [ref=f12e112]:
+                - generic [ref=f12e113]:
+                  - heading "Application Ready Room" [level=1] [ref=f12e114]
+                  - generic [ref=f12e115]: •
+                  - generic [ref=f12e116]: Staff Software Engineer, Developer Experience at Linear
+                - generic [ref=f12e117]:
+                  - generic [ref=f12e118]: "Location: Remote (remote)"
+                  - generic [ref=f12e119]: •
+                  - generic [ref=f12e120]: "Stage: Preparing"
+              - generic [ref=f12e121]:
+                - button "Open Application" [disabled]
+            - generic [ref=f12e122]:
+              - generic [ref=f12e125]:
+                - generic [ref=f12e126]:
+                  - generic [ref=f12e127]: Pre-Flight Application Checklist
+                  - generic [ref=f12e128]: Blocking Issues Identified
+                - generic [ref=f12e133]: Verify your tailored materials, grounding evidence, and target destination before external submission.
+              - generic [ref=f12e134]:
+                - generic [ref=f12e135]:
+                  - button "Blocking Issue Tailored Resume Missing No tailored resume or master resume is attached to this application." [ref=f12e136] [cursor=pointer]:
+                    - generic [ref=f12e137]:
+                      - generic [ref=f12e138]:
+                        - generic "Blocking Issue" [ref=f12e139]
+                        - text: Tailored Resume
+                      - generic [ref=f12e140]: Missing
+                    - paragraph [ref=f12e145]: No tailored resume or master resume is attached to this application.
+                  - button "Blocking Issue Resume Version Selected Missing No target resume version ID identified." [ref=f12e146] [cursor=pointer]:
+                    - generic [ref=f12e147]:
+                      - generic [ref=f12e148]:
+                        - generic "Blocking Issue" [ref=f12e149]
+                        - text: Resume Version Selected
+                      - generic [ref=f12e150]: Missing
+                    - paragraph [ref=f12e155]: No target resume version ID identified.
+                  - button "Resume Export Available Unavailable Resume content is empty; export unavailable." [ref=f12e156] [cursor=pointer]:
+                    - generic [ref=f12e157]:
+                      - generic [ref=f12e158]: Resume Export Available
+                      - generic [ref=f12e159]: Unavailable
+                    - paragraph [ref=f12e161]: Resume content is empty; export unavailable.
+                  - button "Cover Letter Needs Review Cover letter draft generated but pending candidate review." [ref=f12e162] [cursor=pointer]:
+                    - generic [ref=f12e163]:
+                      - generic [ref=f12e164]: Cover Letter
+                      - generic [ref=f12e165]: Needs Review
+                    - paragraph [ref=f12e169]: Cover letter draft generated but pending candidate review.
+                  - button "Application Questions Needs Review 0 of 4 questions reviewed." [ref=f12e170] [cursor=pointer]:
+                    - generic [ref=f12e171]:
+                      - generic [ref=f12e172]: Application Questions
+                      - generic [ref=f12e173]: Needs Review
+                    - paragraph [ref=f12e177]: 0 of 4 questions reviewed.
+                  - 'button "Application Destination Ready Verified portal: linear.app" [ref=f12e178] [cursor=pointer]':
+                    - generic [ref=f12e179]:
+                      - generic [ref=f12e180]: Application Destination
+                      - generic [ref=f12e181]: Ready
+                    - paragraph [ref=f12e185]: "Verified portal: linear.app"
+                - generic [ref=f12e189]:
+                  - paragraph [ref=f12e190]: Application Cannot Be Completed Yet
+                  - paragraph [ref=f12e191]: Please resolve the 2 blocking item(s) highlighted above before opening the application destination.
+            - generic [ref=f12e192]:
+              - generic [ref=f12e193]:
+                - tablist [ref=f12e194]:
+                  - tab "Final Review" [selected] [ref=f12e195]
+                  - tab "Tailored Resume" [ref=f12e197]
+                  - tab "Cover Letter" [ref=f12e199]
+                  - tab "Questions & Answers" [ref=f12e201]
+                - button "Copy Summary" [ref=f12e204]
+              - tabpanel [ref=f12e206]:
+                - generic [ref=f12e207]:
+                  - generic [ref=f12e208]:
+                    - generic [ref=f12e209]: Application Package Overview
+                    - generic [ref=f12e210]: Everything prepared for this submission. Review your package before proceeding to Linear's portal.
+                  - generic [ref=f12e211]:
+                    - generic [ref=f12e212]:
+                      - generic [ref=f12e213]:
+                        - text: Target Position
+                        - paragraph [ref=f12e214]: Staff Software Engineer, Developer Experience
+                        - paragraph [ref=f12e215]: Linear
+                      - generic [ref=f12e216]:
+                        - text: Resume Template
+                        - paragraph [ref=f12e217]: Classic Professional
+                        - paragraph [ref=f12e218]: v1.0
+                      - generic [ref=f12e219]:
+                        - text: Destination
+                        - paragraph [ref=f12e220]: linear.app
+                        - paragraph [ref=f12e221]: https://linear.app/careers/staff-engineer
+                    - generic [ref=f12e222]:
+                      - generic [ref=f12e223]:
+                        - heading "Proceed to External Application" [level=3] [ref=f12e224]
+                        - paragraph [ref=f12e225]: Open Linear's career portal in a new tab to submit. When finished, return here and explicitly confirm submission.
+                      - button "Open Application" [disabled]
+        - generic:
+          - generic:
+            - generic:
+              - generic [ref=f12e226]:
+                - generic:
+                  - heading "Documentation" [level=2]
+                - button "Close info panel" [ref=f12e228]
+              - generic [ref=f12e230]:
+                - generic:
+                  - heading "Getting Started" [level=3]
+                  - paragraph: Learn how to get started with this application.
+                  - generic:
+                    - heading "Learn more" [level=4]
+                    - list:
+                      - listitem:
+                        - link "Installation Guide":
+                          - /url: "#"
+                          - img:
+                            - generic [ref=f12e232] [cursor=pointer]
+              - button "Toggle Infobar" [ref=f12e233]
+  - button "Open Next.js Dev Tools" [ref=f12e239] [cursor=pointer]
+  - alert [ref=f12e243]

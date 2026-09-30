@@ -311,6 +311,8 @@ export interface ResumeVersion {
   certifications: CandidateCertification[];
   changes: ResumeChange[];
   approvalState: 'draft' | 'in_review' | 'approved';
+  isLocked?: boolean;
+  version?: number;
   createdAt: string;
   updatedAt: string;
 }

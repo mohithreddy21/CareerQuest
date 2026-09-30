@@ -112,9 +112,10 @@ import {
 } from './career-repository.interface';
 import { SearchAnalyticsService } from '@/features/analytics/services/analytics-service';
 import { NextActionsService } from '@/features/overview/services/next-actions-service';
-import { ConcurrencyError } from '@/types/errors';
+import { ConcurrencyError, LockedResumeVersionError } from '@/types/errors';
 import { extractResumeContent } from '@/types/resume-content';
 import { RESUME_TEMPLATES } from '@/features/templates/constants/templates';
+import { JobSnapshot, ApplicationHistoricalPackage } from '@/types/application-tracking';
 
 /**
  * Resolves candidate ID with strict invariant enforcement.
@@ -2790,6 +2791,16 @@ export class PrismaCareerRepository implements ICareerRepository {
     const versionId =
       version.id || `res_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
+    if (version.id) {
+      const existing = await prisma.resumeVersion.findFirst({
+        where: { id: version.id, candidateId: candId },
+        select: { id: true, isLocked: true }
+      });
+      if (existing?.isLocked) {
+        throw new LockedResumeVersionError();
+      }
+    }
+
     const saved = await prisma.resumeVersion.upsert({
       where: { id: versionId },
       create: {
@@ -3255,8 +3266,10 @@ export class PrismaCareerRepository implements ICareerRepository {
           resumeVersionId: targetResumeVersionId,
           selectedTemplateId: templateId,
           selectedTemplateVersion: templateVersion,
-          matchScoreAtApplication: matchScore,
-          resumeSnapshot: frozenResumeSnapshot as unknown as Prisma.InputJsonValue,
+          matchScoreAtApplication: app.matchScoreAtApplication ?? matchScore,
+          resumeSnapshot:
+            (app.resumeSnapshot as unknown as Prisma.InputJsonValue) ||
+            (frozenResumeSnapshot as unknown as Prisma.InputJsonValue),
           ...(applicationAnswers !== undefined
             ? { applicationAnswers: applicationAnswers as unknown as Prisma.InputJsonValue }
             : {}),
@@ -3267,27 +3280,102 @@ export class PrismaCareerRepository implements ICareerRepository {
         include: { interviewStages: true, contacts: true, exports: true }
       });
 
-      // 8. Append immutable ApplicationEvent inside transaction
-      await tx.applicationEvent.create({
-        data: {
-          candidateId: candId,
-          applicationId: app.id,
-          jobId: app.jobId,
-          type: 'applied_confirmed',
-          title: 'Application Confirmed',
-          description: note,
-          isAutomated: false,
-          metadata: {
-            templateId,
-            templateVersion,
-            matchScoreAtApplication: matchScore,
-            resumeVersionId: targetResumeVersionId
-          }
-        }
+      // 8. Capture immutable Job Snapshot
+      const jobSnapshot: JobSnapshot = {
+        title: app.job.title,
+        company: app.job.company,
+        location: app.job.location,
+        workArrangement: app.job.workArrangement,
+        description: app.job.description,
+        responsibilities: app.job.responsibilities || [],
+        requiredSkills: app.job.requiredSkills || [],
+        preferredSkills: app.job.preferredSkills || [],
+        sourceUrl: app.job.originalUrl || null,
+        capturedAt: now.toISOString()
+      };
+
+      // 9. Append immutable ApplicationEvent inside transaction (if not already confirmed)
+      const existingConfirmedEvent = await tx.applicationEvent.findFirst({
+        where: { applicationId: app.id, type: 'applied_confirmed' }
       });
+
+      if (!existingConfirmedEvent) {
+        await tx.applicationEvent.create({
+          data: {
+            candidateId: candId,
+            applicationId: app.id,
+            jobId: app.jobId,
+            type: 'applied_confirmed',
+            title: 'Application Confirmed',
+            description: note,
+            isAutomated: false,
+            metadata: {
+              templateId,
+              templateVersion,
+              matchScoreAtApplication: matchScore,
+              resumeVersionId: targetResumeVersionId,
+              jobSnapshot
+            } as unknown as Prisma.InputJsonValue
+          }
+        });
+      }
 
       return this.mapApplication(updated);
     });
+  }
+
+  async getApplicationHistoricalPackage(
+    applicationId: string,
+    candidateId?: string
+  ): Promise<ApplicationHistoricalPackage | null> {
+    const candId = resolveCandidateId(candidateId, 'getApplicationHistoricalPackage');
+    const a = await prisma.application.findFirst({
+      where: { id: applicationId, candidateId: candId },
+      include: {
+        job: true,
+        events: {
+          where: { type: 'applied_confirmed' },
+          orderBy: { timestamp: 'asc' }
+        }
+      }
+    });
+
+    if (!a) return null;
+    const isApplied = a.status === 'applied' || Boolean(a.dateApplied);
+    if (!isApplied) {
+      return null;
+    }
+
+    const confirmedEvent = a.events[0];
+    const eventMetadata = confirmedEvent?.metadata as Record<string, unknown> | undefined;
+    const jobSnapshot = (eventMetadata?.jobSnapshot as JobSnapshot) || null;
+    const isHistoricalJobSnapshot = Boolean(jobSnapshot);
+
+    const domainJob = this.mapJob(a.job);
+    const resumeSnapshot =
+      (a.resumeSnapshot as unknown as import('@/types/resume-content').ResumeContent) || null;
+    const applicationAnswers =
+      (a.applicationAnswers as unknown as ApplicationHistoricalPackage['applicationAnswers']) || [];
+
+    return {
+      applicationId: a.id,
+      candidateId: a.candidateId,
+      jobId: a.jobId,
+      status: a.status as ApplicationStatus,
+      dateApplied: a.dateApplied ? a.dateApplied.toISOString() : a.updatedAt.toISOString(),
+      matchScoreAtApplication: a.matchScoreAtApplication,
+      selectedTemplateId: (a.selectedTemplateId as ResumeTemplateId) || 'classic-v1',
+      selectedTemplateVersion: a.selectedTemplateVersion || '1.0',
+      resumeSnapshot,
+      coverLetter: a.coverLetter,
+      coverLetterData:
+        (a.coverLetterData as unknown as import('@/types/preparation').GroundedCoverLetter) || null,
+      applicationAnswers,
+      jobSnapshot,
+      currentJob: domainJob,
+      isHistoricalJobSnapshot,
+      submissionEventTimestamp: confirmedEvent?.timestamp.toISOString()
+    };
   }
 
   async updateApplicationStatus(

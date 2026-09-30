@@ -18,3 +18,10 @@ export class ValidationError extends Error {
     this.name = 'ValidationError';
   }
 }
+
+export class LockedResumeVersionError extends Error {
+  constructor(message = 'Cannot modify locked resume version.') {
+    super(message);
+    this.name = 'LockedResumeVersionError';
+  }
+}

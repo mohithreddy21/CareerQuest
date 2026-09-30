@@ -1,0 +1,22 @@
+[     230ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_05obe5l._.js:1073
+[     809ms] [LOG] [Fast Refresh] done in 703ms @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_05obe5l._.js:1073
+[     915ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_05obe5l._.js:1073
+[    1135ms] [LOG] [Fast Refresh] done in 324ms @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_05obe5l._.js:1073
+[    1753ms] [LOG] [Client Instrumentation Hook] Slow execution detected: 21ms (Note: Code download overhead is not included in this measurement) @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_05obe5l._.js:702
+[    1762ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_05obe5l._.js:1073
+[    1882ms] [LOG] [HMR] connected @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_05obe5l._.js:1073
+[    2091ms] [WARNING] Clerk: Clerk has been loaded with development keys. Development instances have strict usage limits and should not be used when deploying your application to production. Learn more: https://clerk.com/docs/deployments/overview @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_05obe5l._.js:1073
+[    2865ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_05obe5l._.js:1073
+[    3176ms] [LOG] [Fast Refresh] done in 501ms @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_05obe5l._.js:1073
+[   13209ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_05obe5l._.js:1073
+[   13446ms] [LOG] [Fast Refresh] done in 341ms @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_05obe5l._.js:1073
+[   66539ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_05obe5l._.js:1073
+[   67059ms] [LOG] [Fast Refresh] done in 633ms @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_05obe5l._.js:1073
+[   95190ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_05obe5l._.js:1073
+[   95691ms] [LOG] [Fast Refresh] done in 614ms @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_05obe5l._.js:1073
+[  112699ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_05obe5l._.js:1073
+[  113169ms] [LOG] [Fast Refresh] done in 570ms @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_05obe5l._.js:1073
+[  142581ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_05obe5l._.js:1073
+[  143035ms] [LOG] [Fast Refresh] done in 556ms @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_05obe5l._.js:1073
+[  164750ms] [LOG] [Fast Refresh] rebuilding @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_05obe5l._.js:1073
+[  165186ms] [LOG] [Fast Refresh] done in 551ms @ http://localhost:3000/_next/static/chunks/node_modules_next_dist_05obe5l._.js:1073

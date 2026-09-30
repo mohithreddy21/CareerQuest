@@ -1,0 +1,288 @@
+- generic [active] [ref=f13e1]:
+  - region "Notifications alt+T"
+  - generic [ref=f13e2]:
+    - link "Skip to content" [ref=f13e3] [cursor=pointer]:
+      - /url: "#main-content"
+    - generic [ref=f13e6]:
+      - generic [ref=f13e12]:
+        - generic [ref=f13e13]:
+          - generic [ref=f13e14]: Overview
+          - list [ref=f13e15]:
+            - listitem [ref=f13e16]:
+              - link "Dashboard" [ref=f13e17] [cursor=pointer]:
+                - /url: /dashboard/overview
+            - listitem [ref=f13e23]:
+              - link "Discover Jobs" [ref=f13e24] [cursor=pointer]:
+                - /url: /dashboard/discover
+            - listitem [ref=f13e28]:
+              - link "Applications" [ref=f13e29] [cursor=pointer]:
+                - /url: /dashboard/applications
+            - listitem [ref=f13e33]:
+              - link "Resume & Profile" [ref=f13e34] [cursor=pointer]:
+                - /url: /dashboard/resume
+        - generic [ref=f13e38]:
+          - generic [ref=f13e39]: Preferences
+          - list [ref=f13e40]:
+            - listitem [ref=f13e41]:
+              - link "Settings" [ref=f13e42] [cursor=pointer]:
+                - /url: /dashboard/settings
+      - list [ref=f13e47]:
+        - listitem [ref=f13e48]:
+          - button "CA Candidate Workspace" [ref=f13e49]:
+            - generic [ref=f13e50]:
+              - generic [ref=f13e51]: CA
+              - generic: Candidate Workspace
+      - button "Toggle Sidebar" [ref=f13e56]
+    - main [ref=f13e57]:
+      - generic [ref=f13e58]:
+        - generic [ref=f13e59]:
+          - button "Toggle Sidebar" [ref=f13e60]
+          - separator [ref=f13e62]
+          - navigation "breadcrumb" [ref=f13e63]:
+            - list [ref=f13e64]:
+              - listitem [ref=f13e65]:
+                - link "Dashboard" [ref=f13e66] [cursor=pointer]:
+                  - /url: /dashboard
+              - listitem [aria-hidden] [ref=f13e67]
+              - listitem [ref=f13e70]:
+                - link "Applications" [ref=f13e71] [cursor=pointer]:
+                  - /url: /dashboard/applications
+              - listitem [aria-hidden] [ref=f13e72]
+              - link "Cmukowpjy0015u48kwezsfutf" [disabled] [ref=f13e75]
+        - generic [ref=f13e76]:
+          - button "Search... ⌘ K" [ref=f13e79]:
+            - text: Search...
+            - generic:
+              - generic: ⌘
+              - text: K
+          - button "Toggle theme" [ref=f13e80]
+          - generic [ref=f13e83]:
+            - generic [ref=f13e84]: Theme
+            - combobox "Theme" [ref=f13e85]:
+              - generic [ref=f13e87]: Vercel
+              - generic: T T
+              - img [aria-hidden]: ▼
+            - textbox [aria-hidden] [ref=f13e88]: vercel
+          - button "Notifications" [ref=f13e89]
+      - generic [ref=f13e91]:
+        - generic [ref=f13e92]:
+          - generic [ref=f13e94]:
+            - heading "Application Preparation" [level=1] [ref=f13e96]
+            - paragraph [ref=f13e97]: Review tailored materials, draft answers, and track interview milestones.
+          - generic [ref=f13e98]:
+            - generic [ref=f13e99]:
+              - link "Back to Applications" [ref=f13e100] [cursor=pointer]:
+                - /url: /dashboard/applications
+              - generic [ref=f13e103]: /
+              - generic [ref=f13e104]: Staff Software Engineer, Developer Experience at Linear
+            - generic [ref=f13e106]:
+              - generic [ref=f13e107]:
+                - generic [ref=f13e108]:
+                  - heading "Staff Software Engineer, Developer Experience" [level=1] [ref=f13e109]
+                  - generic [ref=f13e110]: •
+                  - generic [ref=f13e111]: Linear
+                - generic [ref=f13e112]:
+                  - generic [ref=f13e113]: "Location: Remote (remote)"
+                  - generic [ref=f13e114]: •
+                  - generic [ref=f13e115]: "Discovered: 2026-09-28"
+                  - generic [ref=f13e116]: •
+                  - generic [ref=f13e117]: "Applied: 2026-09-30"
+              - generic [ref=f13e118]:
+                - generic [ref=f13e119]:
+                  - generic [ref=f13e120]: "Stage:"
+                  - combobox [ref=f13e121]:
+                    - generic [ref=f13e122]: Applied
+                    - img [aria-hidden]: ▼
+                  - textbox [aria-hidden] [ref=f13e123]: applied
+                - link "Ready Room" [ref=f13e124] [cursor=pointer]:
+                  - /url: /dashboard/applications/cmukowpjy0015u48kwezsfutf/prepare
+                - button "Apply on Linear" [ref=f13e126]
+            - generic [ref=f13e128]:
+              - generic [ref=f13e129]:
+                - tablist [ref=f13e130]:
+                  - tab "Submitted Package" [selected] [ref=f13e131]
+                  - tab "Final Review & Status" [ref=f13e133]
+                  - tab "Tailored Resume" [ref=f13e135]
+                  - tab "Cover Letter & Q&A" [ref=f13e137]
+                  - tab "Interviews & Follow-ups" [ref=f13e139]
+                  - tab "Timeline & Activity" [ref=f13e141]
+                - generic [ref=f13e143]:
+                  - text: "Readiness:"
+                  - strong [ref=f13e144]: In Review
+              - tabpanel [ref=f13e145]:
+                - generic [ref=f13e146]:
+                  - generic [ref=f13e148]:
+                    - generic [ref=f13e149]:
+                      - generic [ref=f13e150]:
+                        - generic [ref=f13e151]: Immutable Historical Record
+                        - generic [ref=f13e155]: Submitted & Frozen
+                        - generic [ref=f13e156]: Applied
+                      - heading "Submitted Application Package" [level=2] [ref=f13e157]
+                      - paragraph [ref=f13e158]: This is a permanent, read-only snapshot of the exact job posting, tailored resume, cover letter, and responses submitted on 30/9/2026. Subsequent edits to your Knowledge Bank, Master Resume, or active job listings do not alter this historical record.
+                    - generic [ref=f13e159]:
+                      - generic [ref=f13e160]:
+                        - generic [ref=f13e161]: "Date Submitted:"
+                        - generic [ref=f13e162]: 2026-09-30
+                      - generic [ref=f13e163]:
+                        - generic [ref=f13e164]: "Match at Apply:"
+                        - generic [ref=f13e165]: N/A
+                      - generic [ref=f13e166]:
+                        - generic [ref=f13e167]: "Template:"
+                        - generic [ref=f13e168]: Modern Tech (v1.0)
+                  - generic [ref=f13e169]:
+                    - generic [ref=f13e171]:
+                      - generic [ref=f13e172]:
+                        - generic [ref=f13e173]:
+                          - generic [ref=f13e174]: Job Context at Submission
+                          - generic [ref=f13e175]: Captured at Submission
+                        - generic [ref=f13e176]: Job details captured at submission time. Protected from external re-scraping and live job updates.
+                      - link "View Source Posting" [ref=f13e177] [cursor=pointer]:
+                        - /url: https://linear.app/careers/staff-engineer
+                    - generic [ref=f13e183]:
+                      - generic [ref=f13e184]:
+                        - generic [ref=f13e185]:
+                          - generic [ref=f13e186]: Role Title
+                          - text: Staff Software Engineer, Developer Experience
+                        - generic [ref=f13e187]:
+                          - generic [ref=f13e188]: Company
+                          - text: Linear
+                        - generic [ref=f13e189]:
+                          - generic [ref=f13e190]: Location & Arrangement
+                          - generic [ref=f13e191]: Remote • remote
+                      - generic [ref=f13e192]:
+                        - heading "Description" [level=4] [ref=f13e193]
+                        - paragraph [ref=f13e194]: Linear is looking for a Staff Software Engineer to lead frontend architecture and performance. You will build lightning-fast desktop and web applications with offline-first synchronisation and bespoke keyboard-driven interactions.
+                      - generic [ref=f13e195]:
+                        - heading "Key Responsibilities" [level=4] [ref=f13e196]
+                        - list [ref=f13e197]:
+                          - listitem [ref=f13e198]: Lead architectural initiatives across our sync engine and client applications.
+                          - listitem [ref=f13e199]: Maintain sub-50ms interaction latency across complex issue graphs and boards.
+                          - listitem [ref=f13e200]: Drive technical roadmap and mentor engineers across multiple feature groups.
+                          - listitem [ref=f13e201]: Design intuitive keyboard navigation and offline conflict resolution models.
+                      - generic [ref=f13e202]:
+                        - generic [ref=f13e203]:
+                          - heading "Required Skills" [level=4] [ref=f13e204]
+                          - generic [ref=f13e205]:
+                            - generic [ref=f13e206]: TypeScript
+                            - generic [ref=f13e207]: React
+                            - generic [ref=f13e208]: Real-time Sync
+                            - generic [ref=f13e209]: SQLite
+                            - generic [ref=f13e210]: Performance Optimization
+                        - generic [ref=f13e211]:
+                          - heading "Preferred Skills" [level=4] [ref=f13e212]
+                          - generic [ref=f13e213]:
+                            - generic [ref=f13e214]: Electron
+                            - generic [ref=f13e215]: Offline-First Systems
+                            - generic [ref=f13e216]: WebSockets
+                            - generic [ref=f13e217]: Canvas rendering
+                  - generic [ref=f13e218]:
+                    - generic [ref=f13e220]:
+                      - generic [ref=f13e221]:
+                        - generic [ref=f13e222]:
+                          - generic [ref=f13e223]: Submitted Tailored Resume
+                          - generic [ref=f13e224]: Modern Tech (v1.0)
+                        - generic [ref=f13e225]: Rendered directly from the immutable application resume snapshot.
+                      - generic [ref=f13e226]: Read-Only
+                    - generic [ref=f13e230]:
+                      - generic [ref=f13e231]:
+                        - heading "mohith reddy" [level=1] [ref=f13e232]
+                        - paragraph [ref=f13e233]: Staff Software Engineer
+                        - generic [ref=f13e234]:
+                          - generic [ref=f13e235]: India
+                          - generic [ref=f13e236]: •
+                          - generic [ref=f13e237]: mohith67821@gmail.com
+                      - generic [ref=f13e238]:
+                        - heading "Professional Summary" [level=2] [ref=f13e239]
+                        - paragraph [ref=f13e240]: Experienced software engineer specializing in developer tooling and platform architecture.
+                      - generic [ref=f13e241]:
+                        - heading "Skills & Competencies" [level=2] [ref=f13e242]
+                        - generic [ref=f13e243]:
+                          - generic [ref=f13e244]:
+                            - generic [ref=f13e245]: "Languages & Frameworks:"
+                            - generic [ref=f13e246]: TypeScript
+                            - generic [ref=f13e247]: Node.js
+                            - generic [ref=f13e248]: React
+                            - generic [ref=f13e249]: PostgreSQL
+                            - generic [ref=f13e250]: GraphQL
+                          - generic [ref=f13e251]:
+                            - generic [ref=f13e252]: "Cloud, Data & Tools:"
+                            - generic [ref=f13e253]: Docker
+                            - generic [ref=f13e254]: Kubernetes
+                            - generic [ref=f13e255]: Git
+                          - generic [ref=f13e256]:
+                            - generic [ref=f13e257]: "Architectural & Practice:"
+                            - generic [ref=f13e258]: Leadership
+                            - generic [ref=f13e259]: System Design
+                      - generic [ref=f13e260]:
+                        - heading "Professional Experience" [level=2] [ref=f13e261]
+                        - generic [ref=f13e264]:
+                          - generic [ref=f13e265]: Senior Staff Engineer —
+                          - generic [ref=f13e266]: — Present
+                      - generic [ref=f13e268]:
+                        - heading "Education" [level=2] [ref=f13e269]
+                        - generic [ref=f13e271]:
+                          - paragraph [ref=f13e272]: B.S. in Computer Science in
+                          - paragraph [ref=f13e273]: University of Engineering • — Present
+                  - generic [ref=f13e274]:
+                    - generic [ref=f13e276]:
+                      - generic [ref=f13e277]:
+                        - generic [ref=f13e278]: Submitted Cover Letter
+                        - generic [ref=f13e279]: Exact letter text frozen upon submission confirmation.
+                      - generic [ref=f13e280]: Read-Only
+                    - generic [ref=f13e282]: Dear Linear Hiring Team, I am writing to submit my application for the Staff Software Engineer, Developer Experience position at Linear. With a commitment to high standards and structured engineering practices, I have followed Linear's technical trajectory and developer-first products with admiration. I am eager to contribute my background and disciplined engineering approach to the initiatives and team objectives at Linear. My core strengths in TypeScript, React, Real-time Sync align closely with the engineering initiatives outlined for Linear. I am passionate about engineering craftsmanship, deep observability, and fostering collaborative teams that deliver resilient software. Thank you for your time and consideration. I welcome the opportunity to discuss how my verified background and technical capabilities can support Linear's engineering goals. Sincerely, mohith reddy
+                  - generic [ref=f13e284]:
+                    - generic [ref=f13e286]:
+                      - generic [ref=f13e287]:
+                        - generic [ref=f13e288]: Submitted Application Questions
+                        - generic [ref=f13e289]: Frozen candidate answers provided for employer application prompts.
+                      - generic [ref=f13e290]: Read-Only
+                    - generic [ref=f13e293]:
+                      - generic [ref=f13e294]:
+                        - generic [ref=f13e295]:
+                          - generic [ref=f13e296]:
+                            - generic [ref=f13e297]: Q1.
+                            - generic [ref=f13e298]: Why are you interested in joining Linear as a Staff Software Engineer, Developer Experience?
+                          - generic [ref=f13e299]: motivation
+                        - generic [ref=f13e300]: I have long followed Linear's engineering culture and focus on high-reliability systems. Throughout my career at Veloce Labs and Apex Cloud Systems, I have focused on building scalable, latency-sensitive web architectures and developer experiences. The technical roadmap for Linear directly aligns with my passion for distributed cloud services and engineering craftsmanship.
+                      - generic [ref=f13e301]:
+                        - generic [ref=f13e302]:
+                          - generic [ref=f13e303]:
+                            - generic [ref=f13e304]: Q2.
+                            - generic [ref=f13e305]: Describe a recent technical challenge you solved and how you measured success.
+                          - generic [ref=f13e306]: behavioral
+                        - generic [ref=f13e307]: At Veloce Labs, our core dashboard experienced p95 latency spikes up to 2.4s under peak concurrency. I spearheaded an architectural overhaul incorporating SSR streaming, query cache normalization, and tiered Redis caching. This dropped p95 latency by over 80% down to 420ms and cut Redis CPU utilization by 45%, directly improving retention across 120,000 active users.
+                      - generic [ref=f13e308]:
+                        - generic [ref=f13e309]:
+                          - generic [ref=f13e310]:
+                            - generic [ref=f13e311]: Q3.
+                            - generic [ref=f13e312]: Tell us about an open-source tool, system, or project you built from scratch.
+                          - generic [ref=f13e313]: technical
+                        - generic [ref=f13e314]: I designed and open-sourced OpenMetric Dashboard, a real-time observability visualizer built with TypeScript, Next.js, and WebSocket streaming. It earned over 1,800 GitHub stars and is adopted by more than 300 engineering teams globally for lightweight metrics visualization.
+                      - generic [ref=f13e315]:
+                        - generic [ref=f13e316]:
+                          - generic [ref=f13e317]:
+                            - generic [ref=f13e318]: Q4.
+                            - generic [ref=f13e319]: How do you collaborate across disciplines (product, design, infra) to maintain delivery velocity?
+                          - generic [ref=f13e320]: behavioral
+                        - generic [ref=f13e321]: I treat engineering velocity and product alignment as shared responsibilities. At Veloce Labs, I led full-stack squads in close sync with product managers and UX designers, establishing clear API contracts early and implementing optimistic UI patterns so features felt instantaneous to users while backend pipelines scaled safely.
+        - generic:
+          - generic:
+            - generic:
+              - generic [ref=f13e322]:
+                - generic:
+                  - heading "Documentation" [level=2]
+                - button "Close info panel" [ref=f13e324]
+              - generic [ref=f13e326]:
+                - generic:
+                  - heading "Getting Started" [level=3]
+                  - paragraph: Learn how to get started with this application.
+                  - generic:
+                    - heading "Learn more" [level=4]
+                    - list:
+                      - listitem:
+                        - link "Installation Guide":
+                          - /url: "#"
+                          - img:
+                            - generic [ref=f13e328] [cursor=pointer]
+              - button "Toggle Infobar" [ref=f13e329]
+  - button "Open Next.js Dev Tools" [ref=f13e335] [cursor=pointer]

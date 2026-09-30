@@ -1,11 +1,17 @@
 import { queryOptions } from '@tanstack/react-query';
-import { getApplicationById, getApplicationEvents, getApplications } from './service';
+import {
+  getApplicationById,
+  getApplicationEvents,
+  getApplicationHistoricalPackage,
+  getApplications
+} from './service';
 
 export const applicationKeys = {
   all: ['applications'] as const,
   list: () => [...applicationKeys.all, 'list'] as const,
   detail: (id: string) => [...applicationKeys.all, 'detail', id] as const,
-  events: (id?: string) => [...applicationKeys.all, 'events', id ?? 'all'] as const
+  events: (id?: string) => [...applicationKeys.all, 'events', id ?? 'all'] as const,
+  historicalPackage: (id: string) => [...applicationKeys.all, 'historical-package', id] as const
 };
 
 export const applicationsQueryOptions = () =>
@@ -24,4 +30,10 @@ export const applicationEventsQueryOptions = (applicationId?: string) =>
   queryOptions({
     queryKey: applicationKeys.events(applicationId),
     queryFn: () => getApplicationEvents(applicationId)
+  });
+
+export const applicationHistoricalPackageOptions = (applicationId: string) =>
+  queryOptions({
+    queryKey: applicationKeys.historicalPackage(applicationId),
+    queryFn: () => getApplicationHistoricalPackage(applicationId)
   });

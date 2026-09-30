@@ -81,10 +81,11 @@ import {
   SearchInsightEngine
 } from '@/features/analytics/services/insight-engine';
 import { SearchAnalyticsService } from '@/features/analytics/services/analytics-service';
-import { NextActionsService } from '@/features/overview/services/next-actions-service';
-import { ConcurrencyError } from '@/types/errors';
+import { ConcurrencyError, LockedResumeVersionError } from '@/types/errors';
 import { extractResumeContent } from '@/types/resume-content';
 import { RESUME_TEMPLATES } from '@/features/templates/constants/templates';
+import { JobSnapshot, ApplicationHistoricalPackage } from '@/types/application-tracking';
+import { NextActionsService } from '@/features/overview/services/next-actions-service';
 
 /**
  * InMemoryCareerRepository
@@ -779,7 +780,7 @@ export class InMemoryCareerRepository implements ICareerRepository {
   }
 
   async addJob(
-    jobData: Omit<Job, 'id' | 'normalizedAt'> & {
+    jobData: (Omit<Job, 'id' | 'normalizedAt'> | Job) & {
       isPublic?: boolean;
       importedByCandidateId?: string;
     },
@@ -787,8 +788,9 @@ export class InMemoryCareerRepository implements ICareerRepository {
   ): Promise<Job> {
     const newJob: Job = {
       ...jobData,
-      id: `job-${Date.now()}`,
-      normalizedAt: new Date().toISOString(),
+      id: (jobData as unknown as Record<string, string>).id || `job-${Date.now()}`,
+      normalizedAt:
+        (jobData as unknown as Record<string, string>).normalizedAt || new Date().toISOString(),
       ...(candidateId
         ? { importedByCandidateId: candidateId, isPublic: jobData.isPublic ?? false }
         : {})
@@ -2139,6 +2141,9 @@ export class InMemoryCareerRepository implements ICareerRepository {
 
     const idx = this.db.resumes.findIndex((r) => r.id === version.id);
     if (idx >= 0) {
+      if (this.db.resumes[idx].isLocked) {
+        throw new LockedResumeVersionError();
+      }
       this.db.resumes[idx] = toSave;
     } else {
       this.db.resumes.push(toSave);
@@ -2389,6 +2394,7 @@ export class InMemoryCareerRepository implements ICareerRepository {
 
     // Lock the referenced resume
     resumeRecord.approvalState = 'approved';
+    resumeRecord.isLocked = true;
 
     // Structured snapshot
     const candidateProfile = await this.getCandidateProfile(candId);
@@ -2412,8 +2418,12 @@ export class InMemoryCareerRepository implements ICareerRepository {
     app.resumeVersionId = targetResumeVersionId;
     app.selectedTemplateId = templateId;
     app.selectedTemplateVersion = templateVersion;
-    app.matchScoreAtApplication = matchScore;
-    app.resumeSnapshot = frozenResumeSnapshot;
+    if (app.matchScoreAtApplication === undefined || app.matchScoreAtApplication === null) {
+      app.matchScoreAtApplication = matchScore;
+    }
+    if (!app.resumeSnapshot) {
+      app.resumeSnapshot = frozenResumeSnapshot;
+    }
     if (!app.applicationAnswers && app.preparedQuestions) {
       app.applicationAnswers = (
         app.preparedQuestions as unknown as Array<Record<string, unknown>>
@@ -2435,25 +2445,107 @@ export class InMemoryCareerRepository implements ICareerRepository {
       note
     });
 
-    await this.recordApplicationEvent(
-      {
-        applicationId: app.id,
-        jobId: app.jobId,
-        type: 'applied_confirmed',
-        title: 'Application Confirmed',
-        description: note,
-        isAutomated: false,
-        metadata: {
-          templateId,
-          templateVersion,
-          matchScoreAtApplication: matchScore,
-          resumeVersionId: targetResumeVersionId
+    const currentJob = this.db.jobs.find((j) => j.id === app.jobId);
+    const jobSnapshot: JobSnapshot | null = currentJob
+      ? {
+          title: currentJob.title,
+          company: currentJob.company,
+          location: currentJob.location,
+          workArrangement: currentJob.workArrangement,
+          description: currentJob.description,
+          responsibilities: currentJob.responsibilities || [],
+          requiredSkills: currentJob.requiredSkills || [],
+          preferredSkills: currentJob.preferredSkills || [],
+          sourceUrl:
+            currentJob.originalUrl ||
+            (currentJob as unknown as Record<string, string>).sourceUrl ||
+            null,
+          capturedAt: now.toISOString()
         }
-      },
-      candId
+      : null;
+
+    const existingConfirmedEvent = (this.db.applicationEvents || []).find(
+      (e) => e.applicationId === app.id && e.type === 'applied_confirmed'
     );
 
+    if (!existingConfirmedEvent) {
+      await this.recordApplicationEvent(
+        {
+          applicationId: app.id,
+          jobId: app.jobId,
+          type: 'applied_confirmed',
+          title: 'Application Confirmed',
+          description: note,
+          isAutomated: false,
+          metadata: {
+            templateId,
+            templateVersion,
+            matchScoreAtApplication: matchScore,
+            resumeVersionId: targetResumeVersionId,
+            ...(jobSnapshot ? { jobSnapshot } : {})
+          }
+        },
+        candId
+      );
+    }
+
     return JSON.parse(JSON.stringify(app));
+  }
+
+  async getApplicationHistoricalPackage(
+    applicationId: string,
+    candidateId?: string
+  ): Promise<ApplicationHistoricalPackage | null> {
+    const candId = candidateId || this.db.candidate.id;
+    const a = this.db.applications.find(
+      (app) => app.id === applicationId && app.candidateId === candId
+    );
+    if (!a) return null;
+
+    const isApplied = a.status === 'applied' || Boolean(a.dateApplied);
+    if (!isApplied) {
+      return null;
+    }
+
+    const events = (this.db.applicationEvents || [])
+      .filter((e) => e.applicationId === applicationId && e.type === 'applied_confirmed')
+      .toSorted((e1, e2) => new Date(e1.timestamp).getTime() - new Date(e2.timestamp).getTime());
+
+    const confirmedEvent = events[0];
+    const eventMetadata = confirmedEvent?.metadata as Record<string, unknown> | undefined;
+    const jobSnapshot = (eventMetadata?.jobSnapshot as JobSnapshot) || null;
+    const isHistoricalJobSnapshot = Boolean(jobSnapshot);
+
+    const currentJob = this.db.jobs.find((j) => j.id === a.jobId) || null;
+    if (!currentJob) return null;
+
+    const resumeSnapshot =
+      (a.resumeSnapshot as unknown as import('@/types/resume-content').ResumeContent) || null;
+    const applicationAnswers =
+      (a.applicationAnswers as unknown as ApplicationHistoricalPackage['applicationAnswers']) || [];
+
+    return {
+      applicationId: a.id,
+      candidateId: a.candidateId,
+      jobId: a.jobId,
+      status: a.status as ApplicationStatus,
+      dateApplied:
+        a.dateApplied ||
+        (a as unknown as Record<string, string>).updatedAt ||
+        new Date().toISOString(),
+      matchScoreAtApplication: a.matchScoreAtApplication ?? null,
+      selectedTemplateId: (a.selectedTemplateId as ResumeTemplateId) || 'classic-v1',
+      selectedTemplateVersion: a.selectedTemplateVersion || '1.0',
+      resumeSnapshot,
+      coverLetter: a.coverLetter ?? null,
+      coverLetterData:
+        (a.coverLetterData as unknown as import('@/types/preparation').GroundedCoverLetter) || null,
+      applicationAnswers,
+      jobSnapshot,
+      currentJob: JSON.parse(JSON.stringify(currentJob)),
+      isHistoricalJobSnapshot,
+      submissionEventTimestamp: confirmedEvent?.timestamp
+    };
   }
 
   async updateApplicationStatus(

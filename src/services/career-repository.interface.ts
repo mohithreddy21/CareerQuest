@@ -268,6 +268,10 @@ export interface ICareerRepository {
     candidateId?: string,
     expectedVersion?: number
   ): Promise<Application>;
+  getApplicationHistoricalPackage(
+    applicationId: string,
+    candidateId?: string
+  ): Promise<import('@/types/application-tracking').ApplicationHistoricalPackage | null>;
   updateApplicationStatus(
     id: string,
     status: ApplicationStatus,
